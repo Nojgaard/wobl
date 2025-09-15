@@ -1,0 +1,5 @@
+numpy
+dm_control
+mujoco
+dora-rs-cli
+eclipse-zenoh

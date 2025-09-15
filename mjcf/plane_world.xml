@@ -1,0 +1,23 @@
+<mujoco model="robot">
+    <compiler angle="radian" />
+    <asset>
+        <!-- Ground texture -->
+        <texture name="grid" type="2d" builtin="checker" width="256" height="256"
+                 rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" />
+        <!-- Material using the texture -->
+        <material name="mat_ground" texture="grid" texrepeat="4 4" reflectance="0.2"/>
+        <model file="robot.xml" />
+    </asset>
+
+    <worldbody>
+        <!-- Light source -->
+        <light name="main_light" pos="0 0 5" dir="0 0 -1" diffuse="1 1 1" />
+
+        <!-- Ground plane -->
+        <geom name="ground" type="plane" size="10 10 0.1" material="mat_ground" rgba="0.3 0.3 0.3 1" />
+        <body pos="0 0 0.24" name="freejoint">
+            <joint type="free" />
+            <attach model="robot" prefix="" body="body"/>
+        </body>
+    </worldbody>
+</mujoco>
