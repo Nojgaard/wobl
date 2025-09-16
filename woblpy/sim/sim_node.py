@@ -28,6 +28,10 @@ class SimNode(Node):
         self.app = Application(world, self.update)
 
     def update(self, timestep: TimeStep):
+        if not self._is_open:
+            self.app.running = False
+            return np.zeros(4)
+
         now = time.time()
         orientation = timestep.observation["robot/orientation"]
         angular_velocity = timestep.observation["robot/angular_velocity"]
@@ -66,6 +70,7 @@ class SimNode(Node):
 
 
 def main():
+    print("[SimNode] Starting simulation node...")
     with SimNode() as node:
         try:
             node.app.launch()

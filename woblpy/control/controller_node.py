@@ -1,5 +1,6 @@
 import numpy as np
 import zenoh
+
 from woblpy.common.node import Node
 from woblpy.control.controller import Controller
 from woblpy.messages.imu_pb2 import Imu
@@ -17,7 +18,7 @@ class ControllerNode(Node):
         )
 
         self.imu = Imu()
-        self.imu_sub = self.add_sub("demo/example/simple", callback=self.update_imu)
+        self.imu_sub = self.add_sub("imu", callback=self.update_imu)
 
         self.joint_state = JointState()
         self.joint_state_sub = self.add_sub(
@@ -55,3 +56,4 @@ if __name__ == "__main__":
     print("[ControllerNode] Starting controller node...")
     with ControllerNode() as node:
         node.spin()
+    print("[ControllerNode] Closing node")

@@ -1,3 +1,4 @@
+import signal
 import threading
 import time
 from typing import Callable, Optional
@@ -13,6 +14,12 @@ class Node:
         self._subs: list[zenoh.Subscriber] = []
         self._timer_threads: list[threading.Thread] = []
         self._is_open = True
+        # Register signal handlers for graceful shutdown
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT, self._signal_handler)
+
+    def _signal_handler(self, sig, frame):
+        self.close()
 
     def spin(self):
         try:
