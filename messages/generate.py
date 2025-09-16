@@ -12,6 +12,7 @@ for proto_file in proto_files:
             "protoc",
             "--python_out=woblpy/messages",
             "--pyi_out=woblpy/messages",
+            "--cpp_out=woblcpp/include/wobl/messages",
             "--proto_path=messages",
             proto_file.name,
         ],
