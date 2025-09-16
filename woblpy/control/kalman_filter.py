@@ -40,7 +40,8 @@ class KalmanFilter:
 
         return self.x
 
-    def state(self):
+    @property
+    def value(self):
         """Get current state estimate"""
         return self.x
 

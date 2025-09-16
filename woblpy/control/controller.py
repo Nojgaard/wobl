@@ -2,7 +2,6 @@ import time
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-
 from woblpy.control.diff_drive_kinematics import DiffDriveKinematics
 from woblpy.control.kalman_filter import KalmanFilter
 from woblpy.control.linear_filter import LinearFilter
@@ -26,6 +25,7 @@ class Controller:
 
         self.yaw_rate = LinearFilter(0.5, 0.0)
         self.fwd_velocity = KalmanFilter(0.001, 0.02)
+        # self.fwd_velocity = LinearFilter(0.1, 0.0)
 
         self.cmd_fwd_velocity = LinearFilter(0.2, 0.0)
         self.cmd_yaw_rate = LinearFilter(0.2, 0.0)
@@ -74,7 +74,7 @@ class Controller:
         pitch = self.pitch - self.offset_pitch
         pitch_rate = self.pitch_rate.value
 
-        fwd_velocity = self.fwd_velocity.x - cmd_fwd_velocity
+        fwd_velocity = self.fwd_velocity.value - cmd_fwd_velocity
 
         dt = self.update_dt()
         self.integral_error += fwd_velocity * dt

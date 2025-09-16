@@ -23,8 +23,9 @@ class SimNode(Node):
         self.add_sub("joint_command", self.joint_command)
 
         robot = Robot()
-        robot_world = RobotWorld(robot)
-        self.app = Application(robot_world, self.update)
+        world = RobotWorld(robot)
+        world.set_timesteps(control_timestep=0.015, physics_timestep=0.005)
+        self.app = Application(world, self.update)
 
     def update(self, timestep: TimeStep):
         now = time.time()

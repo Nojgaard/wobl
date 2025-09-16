@@ -86,7 +86,7 @@ class RobotWorld(Task):
             self._arena.attach(self.robot)
         else:
             self._arena.add_free_entity(self.robot)
-        self.set_timesteps(control_timestep=0.01, physics_timestep=0.005)
+        self.set_timesteps(control_timestep=0.015, physics_timestep=0.005)
 
         self.robot.observables.joint_positions.enabled = True
         self.robot.observables.joint_velocities.enabled = True
