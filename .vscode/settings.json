@@ -36,5 +36,7 @@
     // Rust
     "[rust]": {
         "editor.formatOnSave": true
-    }
+    },
+    "cmake.sourceDirectory": "${workspaceFolder}/woblcpp",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
 }
