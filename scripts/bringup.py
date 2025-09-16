@@ -35,14 +35,9 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-def start():
-    controller = subprocess.Popen([sys.executable, "woblpy/control/controller_node.py"])
-    sim = subprocess.Popen([sys.executable, "woblpy/sim/sim_node.py"])
-    procs.extend([controller, sim])
-    print("Started controller and simulation processes.")
+def spin_procs():
+    print("Started controller, IMU node, and servo node.")
     print("Press Ctrl+C to stop all processes")
-
-    # Keep the main process running until Ctrl+C
     try:
         while True:
             # Check if any process has died unexpectedly
@@ -54,8 +49,21 @@ def start():
         cleanup()
 
 
-def stop():
-    cleanup()
+def start_real():
+    """Start processes for real hardware"""
+    controller = subprocess.Popen([sys.executable, "woblpy/control/controller_node.py"])
+    imu_node = subprocess.Popen(["build/woblcpp-linux/scripts/imu_node"])
+    servo_node = subprocess.Popen(["build/woblcpp-linux/scripts/servo_node"])
+    procs.extend([controller, imu_node, servo_node])
+    spin_procs()
+
+
+def start_sim():
+    """Start processes for simulation"""
+    controller = subprocess.Popen([sys.executable, "woblpy/control/controller_node.py"])
+    sim = subprocess.Popen([sys.executable, "woblpy/sim/sim_node.py"])
+    procs.extend([controller, sim])
+    spin_procs()
 
 
 if __name__ == "__main__":
@@ -63,11 +71,15 @@ if __name__ == "__main__":
     atexit.register(cleanup)
     signal.signal(signal.SIGINT, signal_handler)
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("cmd", choices=["start", "stop"])
+    parser = argparse.ArgumentParser(description="Bringup script for WOBL robot")
+    parser.add_argument(
+        "mode",
+        choices=["real", "sim"],
+        help="Mode to run: 'real' for hardware, 'sim' for simulation",
+    )
     args = parser.parse_args()
 
-    if args.cmd == "start":
-        start()
-    elif args.cmd == "stop":
-        stop()
+    if args.mode == "real":
+        start_real()
+    elif args.mode == "sim":
+        start_sim()
