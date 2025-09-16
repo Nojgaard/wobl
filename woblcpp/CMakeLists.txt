@@ -46,11 +46,18 @@ find_package(zenohc REQUIRED)
 find_package(zenohcxx REQUIRED)
 find_package(Protobuf REQUIRED)
 
-include_directories(include)
+add_subdirectory(external/scservo)
+include_directories(include external)
+
 file(GLOB WOBL_MESSAGES_SRC "include/wobl/msg/*.cc")
 file(GLOB_RECURSE WOBL_SRC "src/*.cpp")
 
 add_library(woblcpp woblcpp.cpp ${WOBL_MESSAGES_SRC} ${WOBL_SRC})
-target_link_libraries(woblcpp PUBLIC ICM20948_Lib protobuf::libprotobuf zenohcxx::zenohc)
+target_link_libraries(woblcpp PUBLIC 
+    ICM20948_Lib 
+    SCServo
+    protobuf::libprotobuf 
+    zenohcxx::zenohc
+)
 
 add_subdirectory(scripts)

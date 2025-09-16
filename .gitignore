@@ -17,5 +17,5 @@ build/
 *.pb.h
 *.pb.cpp
 *.pb.hpp
-*.pb2.py
-*.pb2.pyi
+*_pb2.py
+*_pb2.pyi

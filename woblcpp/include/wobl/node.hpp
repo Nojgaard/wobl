@@ -30,6 +30,7 @@ namespace wobl {
         
         // Timer functionality
         void add_timer(std::function<void()> callback, double frequency_hz);
+        double clock() const;
         
     private:
         zenoh::Session session_;

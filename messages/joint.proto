@@ -14,3 +14,8 @@ message JointCommand {
     repeated float position = 2;
     repeated float velocity = 3;
 }
+
+message JointEnable {
+    double timestamp = 1;
+    bool enable = 2;
+}

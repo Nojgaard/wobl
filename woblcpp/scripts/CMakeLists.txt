@@ -1,2 +1,13 @@
-add_executable(imu_node imu_node.cpp)
-target_link_libraries(imu_node PUBLIC woblcpp)
+set(SCRIPT_EXECUTABLES
+	imu_calibrate
+	imu_node
+	servo_midpoint
+	servo_node
+	servo_ping
+	servo_set_id
+)
+
+foreach(EXE ${SCRIPT_EXECUTABLES})
+	add_executable(${EXE} ${EXE}.cpp)
+	target_link_libraries(${EXE} PUBLIC woblcpp)
+endforeach()

@@ -123,3 +123,10 @@ void Node::add_timer(std::function<void()> callback, double frequency_hz)
     auto thread = std::make_unique<std::thread>(timer_func);
     timer_threads_.push_back(std::move(thread));
 }
+
+double Node::clock() const
+{
+    return std::chrono::duration<double>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
+}

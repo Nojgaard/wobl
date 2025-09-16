@@ -7,6 +7,8 @@ proto_files = list(messages_dir.glob("*.proto"))
 
 for proto_file in proto_files:
     print(f"Generating {proto_file.name}...")
+    Path("woblpy/messages").mkdir(parents=True, exist_ok=True)
+    Path("woblcpp/include/wobl/msg").mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
             "protoc",
