@@ -8,3 +8,14 @@ out/
 target/
 debug/
 Cargo.lock
+
+# C++
+build/
+
+# proto messages
+*.pb.cc
+*.pb.h
+*.pb.cpp
+*.pb.hpp
+*.pb2.py
+*.pb2.pyi

@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package wobl.msg; 
+
 message JointState {
     double timestamp = 1;
     repeated float position = 2;
