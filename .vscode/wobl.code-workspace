@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "firmware",
+			"path": "../firmware"
+		}
+	],
+	"settings": {
+		"terminal.integrated.env.windows": {
+			"PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"
+		},
+		"terminal.integrated.env.linux": {
+			"PYTHONPATH": "${workspaceFolder}:${env:PYTHONPATH}"
+		}
+	}
+}

@@ -2,7 +2,8 @@
     "files.exclude": {
         "**/target": true,
         "**/.pio": true,
-        "**/__pycache__": true
+        "**/__pycache__": true,
+        "firmware": true
     },
     "terminal.integrated.env.windows": {
         "PYTHONPATH": "${workspaceFolder};${env:PYTHONPATH}"
