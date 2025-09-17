@@ -63,11 +63,29 @@ bool initialize(wobl::real::ServoDriver &driver,
 
 bool has_pending_command(int idx, const wobl::msg::JointCommand &cur,
                          const wobl::msg::JointCommand &prev) {
-  if (cur.timestamp() != prev.timestamp() && prev.timestamp() == 0.0)
+  if (cur.timestamp() == 0.0)
+    return false;
+
+  if (prev.timestamp() == 0.0)
     return true;
 
-  if (cur.position_size() != 4 && cur.velocity_size() != 4) {
+  if (cur.position().size() <= idx || cur.velocity().size() <= idx ||
+      prev.position().size() <= idx || prev.velocity().size() <= idx) {
+    std::cerr << "[SERVO] Array size mismatch or invalid index. cur pos:"
+              << cur.position().size() << " vel:" << cur.velocity().size()
+              << " prev pos:" << prev.position().size()
+              << " vel:" << prev.velocity().size() << " idx:" << idx
+              << std::endl;
+    return false;
+  }
+
+  if (cur.position().size() != 4 || cur.velocity().size() != 4) {
     std::cerr << "[SERVO] Invalid command size" << std::endl;
+    return false;
+  }
+
+  if (idx < 0 || idx >= 4) {
+    std::cerr << "[SERVO] Invalid joint index (" << idx << ")" << std::endl;
     return false;
   }
 
@@ -97,7 +115,7 @@ int main(int, char **) {
         if (!is_enabled)
           return;
 
-        for (size_t i = 0; i < servo_ids.size(); ++i) {
+        for (int i = 0; i < servo_ids.size(); ++i) {
           if (!has_pending_command(i, msg_command, msg_command_prev))
             continue;
 
@@ -112,6 +130,7 @@ int main(int, char **) {
                                   0.35);
           }
         }
+        msg_command_prev.CopyFrom(msg_command);
 
         double now = node.clock();
         if (now - last_state_publish_time >= 0.02) {

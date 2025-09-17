@@ -1,10 +1,11 @@
+import time
 import numpy as np
 import zenoh
 
 from woblpy.common.node import Node
 from woblpy.control.controller import Controller
 from woblpy.messages.imu_pb2 import Imu
-from woblpy.messages.joint_pb2 import JointCommand, JointState
+from woblpy.messages.joint_pb2 import JointCommand, JointState, JointEnable
 
 
 class ControllerNode(Node):
@@ -25,6 +26,10 @@ class ControllerNode(Node):
             "joint_state", callback=self.update_joint_state
         )
 
+        self.joint_enable = JointEnable(timestamp=time.time(), enable=True)
+        self.joint_enable_pub = self.add_pub("joint_enable")
+        self.send(self.joint_enable_pub, self.joint_enable)
+
         self.controller = Controller()
 
         self.K = np.array([-7.70647133, -0.87846039, 2.61800094, 1.41421356])
@@ -33,7 +38,7 @@ class ControllerNode(Node):
         self.filtered_pitch_rate = 0.0
         self.velocity_integral = 0.0
 
-        self.add_timer(self.update, frequency_hz=70)
+        self.add_timer(self.update, frequency_hz=80.0)
 
     def update_imu(self, sample: zenoh.Sample):
         self.imu.ParseFromString(sample.payload.to_bytes())
@@ -49,6 +54,7 @@ class ControllerNode(Node):
 
         joint_command = self.joint_command
         self.controller.update(joint_command)
+        joint_command.timestamp = time.time()
         self.send(self.joint_command_pub, joint_command)
 
 
