@@ -16,16 +16,23 @@ int main(int, char **) {
   wobl::msg::Imu imu_msg;
   int imu_pub = node.add_pub("imu");
 
+  driver.print_biases();
+  std::cout << "[IMU] Initialization complete, entering main loop" << std::endl;
+
   node.add_timer(
       [&]() {
         bool has_data = driver.try_read(imu_msg);
-        imu_msg.set_timestamp(node.clock());
 
+        if (!driver.status()) {
+          std::cerr << "[IMU] IMU error" << std::endl;
+          return;
+        }
+
+        imu_msg.set_timestamp(node.clock());
         if (has_data)
           node.send(imu_pub, imu_msg);
       },
       100);
-  std::cout << "[IMU] Initialization complete, entering main loop" << std::endl;
   node.spin();
   return 0;
 }

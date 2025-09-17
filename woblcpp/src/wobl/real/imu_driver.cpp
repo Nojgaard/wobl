@@ -105,8 +105,6 @@ bool ImuDriver::try_read(msg::Imu &data_imu) {
     return false;
   }
 
-  icm_.readDMPdataFromFIFO(&data_dmp_);
-
   ICM_20948_Status_e result = icm_.readDMPdataFromFIFO(&data_dmp_);
   if (result != ICM_20948_Stat_Ok &&
       result != ICM_20948_Stat_FIFOMoreDataAvail) {
@@ -114,10 +112,8 @@ bool ImuDriver::try_read(msg::Imu &data_imu) {
     return false;
   }
 
-  bool has_data = false;
   while ((icm_.status == ICM_20948_Stat_Ok) ||
          (icm_.status == ICM_20948_Stat_FIFOMoreDataAvail)) {
-    has_data = true;
     if ((data_dmp_.header & DMP_header_bitmap_Quat9) >
         0) // We have asked for orientation data so we should receive Quat9
     {
@@ -155,7 +151,7 @@ bool ImuDriver::try_read(msg::Imu &data_imu) {
     icm_.readDMPdataFromFIFO(&data_dmp_);
   }
   icm_.status = ICM_20948_Stat_Ok;
-  return has_data;
+  return true;
 }
 /*
 wobl::msg::Vector3 ImuDriver::bias_linear_acceleration() {
