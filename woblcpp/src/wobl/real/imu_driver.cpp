@@ -44,10 +44,10 @@ bool ImuDriver::initialize() {
               ICM_20948_Stat_Ok);
   status_ &= (icm_.enableDMPSensor(INV_ICM20948_SENSOR_GYROSCOPE) ==
               ICM_20948_Stat_Ok);
-  status_ &= (icm_.enableDMPSensor(INV_ICM20948_SENSOR_ACCELEROMETER) ==
-              ICM_20948_Stat_Ok);
-  // status_ &= (icm_.enableDMPSensor(INV_ICM20948_SENSOR_GEOMAGNETIC_FIELD) ==
-  // ICM_20948_Stat_Ok);
+  // status_ &= (icm_.enableDMPSensor(INV_ICM20948_SENSOR_ACCELEROMETER) ==
+  //             ICM_20948_Stat_Ok);
+  //  status_ &= (icm_.enableDMPSensor(INV_ICM20948_SENSOR_GEOMAGNETIC_FIELD) ==
+  //  ICM_20948_Stat_Ok);
 
   // Configuring DMP to output data at multiple ODRs:
   // DMP is capable of outputting multiple sensor data at different rates to
@@ -55,11 +55,11 @@ bool ImuDriver::initialize() {
   // / ODR ) - 1 E.g. For a 5Hz ODR rate when DMP is running at 55Hz, value =
   // (55/5) - 1 = 10.
   status_ &= (icm_.setDMPODRrate(DMP_ODR_Reg_Quat9, 1) == ICM_20948_Stat_Ok);
-  status_ &= (icm_.setDMPODRrate(DMP_ODR_Reg_Accel, 1) == ICM_20948_Stat_Ok);
   status_ &=
       (icm_.setDMPODRrate(DMP_ODR_Reg_Gyro_Calibr, 1) == ICM_20948_Stat_Ok);
-  // status_ &= (icm_.setDMPODRrate(DMP_ODR_Reg_Cpass_Calibr, 1) ==
-  // ICM_20948_Stat_Ok); // Set to the maximum
+  // status_ &= (icm_.setDMPODRrate(DMP_ODR_Reg_Accel, 1) == ICM_20948_Stat_Ok);
+  //  status_ &= (icm_.setDMPODRrate(DMP_ODR_Reg_Cpass_Calibr, 1) ==
+  //  ICM_20948_Stat_Ok); // Set to the maximum
 
   status_ &= (icm_.enableFIFO() == ICM_20948_Stat_Ok);
   status_ &= (icm_.enableDMP() == ICM_20948_Stat_Ok);
@@ -101,14 +101,9 @@ double get_lsb_to_g(uint8_t dps) {
 }
 
 bool ImuDriver::try_read(msg::Imu &data_imu) {
-  if (icm_.status != ICM_20948_Stat_Ok) {
-    return false;
-  }
-
   ICM_20948_Status_e result = icm_.readDMPdataFromFIFO(&data_dmp_);
   if (result != ICM_20948_Stat_Ok &&
       result != ICM_20948_Stat_FIFOMoreDataAvail) {
-    // Hardware communication error
     return false;
   }
 
@@ -153,42 +148,6 @@ bool ImuDriver::try_read(msg::Imu &data_imu) {
   icm_.status = ICM_20948_Stat_Ok;
   return true;
 }
-/*
-wobl::msg::Vector3 ImuDriver::bias_linear_acceleration() {
-  int32_t x, y ,z;
-  msg::Vector3 bias;
-  status_ &= (icm_.getBias(ICM_20948::Bias::AccelX, &x) == ICM_20948_Stat_Ok);
-  status_ &= (icm_.getBias(ICM_20948::Bias::AccelY, &y) == ICM_20948_Stat_Ok);
-  status_ &= (icm_.getBias(ICM_20948::Bias::AccelZ, &z) == ICM_20948_Stat_Ok);
-  bias.x = x;
-  bias.y = y;
-  bias.z = z;
-  return bias;
-}
-
-wobl::msg::Vector3 ImuDriver::bias_angular_velocity() {
-  int32_t x, y ,z;
-  wobl::msg::Vector3 bias;
-  icm_.getBias(ICM_20948::Bias::GyroX, &x);
-  icm_.getBias(ICM_20948::Bias::GyroY, &y);
-  icm_.getBias(ICM_20948::Bias::GyroZ, &z);
-  bias.x = x;
-  bias.y = y;
-  bias.z = z;
-  return bias;
-}
-
-wobl::msg::Vector3 ImuDriver::bias_compass() {
-  int32_t x, y ,z;
-  wobl::msg::Vector3 bias;
-  icm_.getBias(ICM_20948::Bias::MagX, &x);
-  icm_.getBias(ICM_20948::Bias::MagY, &y);
-  icm_.getBias(ICM_20948::Bias::MagZ, &z);
-  bias.x = x;
-  bias.y = y;
-  bias.z = z;
-  return bias;
-}*/
 
 void ImuDriver::try_load_bias() {
   icm_.setBias(ICM_20948::Bias::AccelX, BIAS_LINEAR_ACCELERATION[0]);

@@ -23,16 +23,14 @@ int main(int, char **) {
       [&]() {
         bool has_data = driver.try_read(imu_msg);
 
-        if (!driver.status()) {
-          std::cerr << "[IMU] IMU error" << std::endl;
-          return;
-        }
-
         imu_msg.set_timestamp(node.clock());
-        if (has_data)
+        if (has_data) {
           node.send(imu_pub, imu_msg);
+        }
       },
       100);
   node.spin();
+
+  std::cout << "[IMU] Exiting..." << std::endl;
   return 0;
 }
