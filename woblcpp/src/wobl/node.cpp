@@ -2,13 +2,25 @@
 #include <chrono>
 #include <thread>
 #include <iostream>
+#include <csignal>
 
 using namespace wobl;
+
+// Global atomic flag for signal interruption
+static std::atomic<bool> signal_interrupted{false};
+
+// Signal handler that sets the interruption flag
+static void signal_handler(int signal)
+{
+    signal_interrupted.store(true);
+}
 
 Node::Node()
     : session_(zenoh::Session::open(zenoh::Config::create_default(), zenoh::Session::SessionOptions::create_default())), 
     is_open_(true)
 {
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
 }
 
 Node::~Node()
@@ -16,9 +28,14 @@ Node::~Node()
     close();
 }
 
+bool Node::is_open() const
+{
+    return is_open_.load() && !signal_interrupted.load();
+}
+
 void Node::spin()
 {
-    while (is_open_.load())
+    while (is_open())
     {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
@@ -111,7 +128,7 @@ void Node::add_timer(std::function<void()> callback, double frequency_hz)
     {
         auto next_call = std::chrono::steady_clock::now() + period;
 
-        while (is_open_.load())
+        while (is_open())
         {
             callback();
 
