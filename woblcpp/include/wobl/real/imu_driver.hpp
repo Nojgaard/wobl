@@ -12,9 +12,8 @@ namespace wobl::real
         ImuDriver();
         bool initialize();
         bool try_read(msg::Imu &imu_msg);
-        //msg::Vector3 bias_linear_acceleration();
-        //msg::Vector3 bias_angular_velocity();
-        //msg::Vector3 bias_compass();
+        bool status() const { return icm_.status == ICM_20948_Stat_Ok; }
+        void print_biases();
 
     private:
         void try_load_bias();

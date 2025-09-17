@@ -36,31 +36,37 @@ int main() {
   ImuDriver imu;
 
   std::cout << std::endl;
-  std::cout << "BIASES" << std::endl;
-  // print(imu.bias_linear_acceleration());
-  // print(imu.bias_angular_velocity());
-  // print(imu.bias_compass());
+  imu.print_biases();
+  std::cout << std::endl;
 
   // Check success
   if (imu.initialize()) {
-    std::cout << "Device initialize" << std::endl;
+    std::cout << "Device initialized" << std::endl;
   } else {
     std::cout << "Device not initialized" << std::endl;
     return 1;
   }
   wobl::msg::Imu msg;
-  auto start = std::chrono::high_resolution_clock::now();
+  auto start = std::chrono::system_clock::now();
+  auto last_print = start;
+  std::cout << "Reading data for 120 seconds" << std::endl;
+
   while (true) {
     bool success = imu.try_read(msg);
-    auto rpy = quat_to_euler(msg.orientation());
-    std::cout << "\rOrientation: " << rpy[0] << " " << rpy[1] << " " << rpy[2]
-              << std::flush;
-    // std::cout << "\r Orientation: " << msg.linear_acceleration.x << " "
-    // <<msg.linear_acceleration.y << " " <<msg.linear_acceleration.z <<
-    // std::flush;
-    std::this_thread::sleep_for(std::chrono::milliseconds(12));
 
-    auto now = std::chrono::high_resolution_clock::now();
+    if (imu.status() == false) {
+      std::cout << "IMU error" << std::endl;
+      break;
+    }
+    auto now = std::chrono::system_clock::now();
+    if (std::chrono::duration<double>(now - last_print).count() > 0.2) {
+      last_print = now;
+      auto rpy = quat_to_euler(msg.orientation());
+      std::cout << "RPY: " << rpy[0] << " " << rpy[1] << " " << rpy[2] << std::endl;
+      // std::cout << "\r Orientation: " << msg.linear_acceleration.x << " "
+      // <<msg.linear_acceleration.y << " " <<msg.linear_acceleration.z <<
+      // std::flush;
+    }
 
     // Calculate elapsed time in seconds
     auto elapsed =
@@ -70,13 +76,11 @@ int main() {
     if (elapsed >= 120) {
       break;
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 
   std::cout << std::endl;
-  std::cout << "BIASES" << std::endl;
-  //  print(imu.bias_linear_acceleration());
-  // print(imu.bias_angular_velocity());
-  // print(imu.bias_compass());
+  imu.print_biases();
 
   return 0;
 }

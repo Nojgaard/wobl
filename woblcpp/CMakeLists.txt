@@ -5,22 +5,39 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Select the correct package depending on architecture
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  set(ZENOHC_URL "https://github.com/eclipse-zenoh/zenoh-c/releases/download/1.5.1/zenoh-c-1.5.1-x86_64-unknown-linux-gnu-standalone.zip")
+  set(ZENOHC_SHA256 "38d5802fc7a239b2dfb0170bdd837894ddc3c2cf26948869cb30d97abd71cf22")
+
+  set(ZENOHCPP_URL "https://github.com/eclipse-zenoh/zenoh-cpp/releases/download/1.5.1/zenohcpp-1.5.1-standalone.zip")
+  set(ZENOHCPP_SHA256 "c32f496a68975964df4f28a0e6d5c061448484424ace5f1a6ea149a8e461037c")
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+  set(ZENOHC_URL "https://github.com/eclipse-zenoh/zenoh-c/releases/download/1.5.1/zenoh-c-1.5.1-aarch64-unknown-linux-gnu-standalone.zip")
+  set(ZENOHC_SHA256 "f47a51b6da35314c22aae84dddf224bd138ca21691b9f7d68314da0550275f0a")
+
+  set(ZENOHCPP_URL "https://github.com/eclipse-zenoh/zenoh-cpp/releases/download/1.5.1/zenoh-cpp-1.5.1-aarch64-apple-darwin-standalone.zip")
+  set(ZENOHCPP_SHA256 "c32f496a68975964df4f28a0e6d5c061448484424ace5f1a6ea149a8e461037c")
+else()
+  message(FATAL_ERROR "Unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
 # External libraries
 include(FetchContent)
 
 # Fetch zenoh-c
 FetchContent_Declare(
   zenohc
-  URL https://github.com/eclipse-zenoh/zenoh-c/releases/download/1.5.1/zenoh-c-1.5.1-x86_64-unknown-linux-gnu-standalone.zip
-  URL_HASH SHA256=38d5802fc7a239b2dfb0170bdd837894ddc3c2cf26948869cb30d97abd71cf22
+  URL ${ZENOHC_URL}
+  URL_HASH SHA256=${ZENOHC_SHA256}
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
 # Fetch zenoh-cpp
 FetchContent_Declare(
   zenohcpp
-  URL https://github.com/eclipse-zenoh/zenoh-cpp/releases/download/1.5.1/zenohcpp-1.5.1-standalone.zip
-  URL_HASH SHA256=c32f496a68975964df4f28a0e6d5c061448484424ace5f1a6ea149a8e461037c
+  URL ${ZENOHCPP_URL}
+  URL_HASH SHA256=${ZENOHCPP_SHA256}
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 
