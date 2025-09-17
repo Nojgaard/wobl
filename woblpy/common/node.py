@@ -56,6 +56,11 @@ class Node:
             raise ValueError("Invalid publisher ID")
         self._pubs[pub_id].put(message.SerializeToString())
 
+    def send_string(self, pub_id: int, message: str):
+        if pub_id < 0 or pub_id >= len(self._pubs):
+            raise ValueError("Invalid publisher ID")
+        self._pubs[pub_id].put(message.encode("utf-8"))
+
     def add_timer(self, callback: Callable[[], None], frequency_hz: float):
         period = 1.0 / frequency_hz
 

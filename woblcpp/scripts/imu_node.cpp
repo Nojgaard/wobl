@@ -25,6 +25,7 @@ int main(int, char **) {
           node.send(imu_pub, imu_msg);
       },
       100);
+  std::cout << "[IMU] Initialization complete, entering main loop" << std::endl;
   node.spin();
   return 0;
 }

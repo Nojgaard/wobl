@@ -5,6 +5,7 @@ set(SCRIPT_EXECUTABLES
 	servo_node
 	servo_ping
 	servo_set_id
+	test_publisher
 )
 
 foreach(EXE ${SCRIPT_EXECUTABLES})
