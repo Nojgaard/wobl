@@ -95,6 +95,7 @@ int main(int, char **) {
 
   wobl::msg::JointState msg_state;
   wobl::msg::JointCommand msg_command, msg_command_prev;
+  wobl::msg::JointCommand msg_command_tmp;
   wobl::msg::JointEnable msg_enable;
 
   double last_state_publish_time = 0.0;
@@ -105,7 +106,7 @@ int main(int, char **) {
   }
 
   int state_pub = node.add_pub("joint_state");
-  node.add_sub("joint_command", &msg_command);
+  node.add_sub("joint_command", &msg_command_tmp);
   node.add_sub("joint_enable", &msg_enable);
 
   node.add_timer(
@@ -113,24 +114,25 @@ int main(int, char **) {
         enable_servos(driver, msg_enable.enable());
         if (!is_enabled)
           return;
-
+        
+        msg_command.CopyFrom(msg_command_tmp);
         for (int i = 0; i < servo_ids.size(); ++i) {
           if (!has_pending_command(i, msg_command, msg_command_prev))
             continue;
 
           u8 id = servo_ids[i];
-          std::cout << "[SERVO] Commanding servo ID " << static_cast<int>(id)
+          /*std::cout << "[SERVO] Commanding servo ID " << static_cast<int>(id)
                     << " to pos " << msg_command.position(i) << " rad, vel "
-                    << msg_command.velocity(i) << " rps" << std::endl;
+                    << msg_command.velocity(i) << " rps" << std::endl;*/
           float mirror_scalar =
               (id == HIP_RIGHT || id == WHEEL_RIGHT) ? 1.0f : -1.0f;
-          /*if (id == HIP_LEFT || id == HIP_RIGHT) {
+          if (id == HIP_LEFT || id == HIP_RIGHT) {
             driver.write_position(id, mirror_scalar * msg_command.position(i),
                                   msg_command.velocity(i), 0.2);
           } else if (id == WHEEL_LEFT || id == WHEEL_RIGHT) {
             driver.write_velocity(id, mirror_scalar * msg_command.velocity(i),
                                   0.35);
-          }*/
+          }
         }
         msg_command_prev.CopyFrom(msg_command);
 
@@ -151,7 +153,7 @@ int main(int, char **) {
           node.send(state_pub, msg_state);
         }
       },
-      100);
+      70);
 
   node.spin();
   enable_servos(driver, false);
