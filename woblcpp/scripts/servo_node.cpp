@@ -85,16 +85,6 @@ bool has_pending_command(int idx, const wobl::msg::JointCommand &cur,
     return false;
   }
 
-  if (cur.position().size() != 4 || cur.velocity().size() != 4) {
-    std::cerr << "[SERVO] Invalid command size" << std::endl;
-    return false;
-  }
-
-  if (idx < 0 || idx >= 4) {
-    std::cerr << "[SERVO] Invalid joint index (" << idx << ")" << std::endl;
-    return false;
-  }
-
   return cur.position(idx) != prev.position(idx) ||
          cur.velocity(idx) != prev.velocity(idx);
 }
