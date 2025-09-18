@@ -52,6 +52,12 @@ bool initialize(wobl::real::ServoDriver &driver,
   driver.set_mode(HIP_RIGHT, wobl::real::ServoDriver::POSITION);
   driver.set_mode(WHEEL_LEFT, wobl::real::ServoDriver::VELOCITY);
   driver.set_mode(WHEEL_RIGHT, wobl::real::ServoDriver::VELOCITY);
+  auto left_servo_state = driver.read_state(HIP_LEFT);
+  auto right_servo_state = driver.read_state(HIP_RIGHT);
+  driver.write_position(HIP_LEFT, left_servo_state.position_rad, 1.0);
+  driver.write_position(HIP_RIGHT, right_servo_state.position_rad, 1.0);
+  driver.write_velocity(WHEEL_LEFT, 0.0);
+  driver.write_velocity(WHEEL_RIGHT, 0.0);
 
   msg_state.mutable_position()->Resize(4, 0.0);
   msg_state.mutable_velocity()->Resize(4, 0.0);
@@ -103,7 +109,9 @@ int main(int, char **) {
 
   double last_state_publish_time = 0.0;
 
-  initialize(driver, msg_state);
+  if (!initialize(driver, msg_state)) {
+    return -1;
+  }
 
   int state_pub = node.add_pub("joint_state");
   node.add_sub("joint_command", &msg_command);
