@@ -89,8 +89,9 @@ int Node::add_sub(const std::string &key,
 int Node::add_sub(const std::string &key,
                   google::protobuf::Message *message)
 {
-    auto callback = [message](const zenoh::Sample &sample)
+    auto callback = [this, message](const zenoh::Sample &sample)
     {
+        std::lock_guard<std::recursive_mutex> lock(this->mutex_);
         auto &payload = sample.get_payload();
 
         if (payload.size() == 0)
@@ -130,7 +131,10 @@ void Node::add_timer(std::function<void()> callback, double frequency_hz)
 
         while (is_open())
         {
-            callback();
+            {
+                std::lock_guard<std::recursive_mutex> lock(this->mutex_);
+                callback();
+            } // Lock is released here
 
             std::this_thread::sleep_until(next_call);
             next_call += period;

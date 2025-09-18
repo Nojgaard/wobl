@@ -14,6 +14,7 @@ class Node:
         self._subs: list[zenoh.Subscriber] = []
         self._timer_threads: list[threading.Thread] = []
         self._is_open = True
+        self._lock = threading.RLock()  # Protect shared state
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -48,7 +49,11 @@ class Node:
         if callback is None:
             raise ValueError("Either message or callback must be provided")
 
-        self._subs.append(self.session.declare_subscriber(key, callback))
+        def safe_callback(sample: zenoh.Sample):
+            with self._lock:
+                callback(sample)
+
+        self._subs.append(self.session.declare_subscriber(key, safe_callback))
         return self._subs[-1]
 
     def send(self, pub_id: int, message: Message):
@@ -67,7 +72,8 @@ class Node:
         def timer_loop():
             next_call = time.time()
             while self._is_open:
-                callback()
+                with self._lock:
+                    callback()
 
                 next_call += period
                 sleep_time = next_call - time.time()
