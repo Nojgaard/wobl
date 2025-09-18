@@ -15,8 +15,8 @@ const std::vector<uint8_t> servo_ids = {HIP_LEFT, HIP_RIGHT, WHEEL_LEFT,
                                         WHEEL_RIGHT};
 bool is_enabled = false;
 
-void enable_servos(wobl::real::ServoDriver &driver, bool enable) {
-  if (enable == is_enabled)
+void enable_servos(wobl::real::ServoDriver &driver, bool enable, bool force = false) {
+  if (enable == is_enabled && !force)
     return;
 
   for (u8 id : servo_ids) {
@@ -46,7 +46,7 @@ bool initialize(wobl::real::ServoDriver &driver,
     std::cout << "[SERVO] Servo with ID " << static_cast<int>(id)
               << " is online" << std::endl;
   }
-  enable_servos(driver, false);
+  enable_servos(driver, false, true);
 
   driver.set_mode(HIP_LEFT, wobl::real::ServoDriver::POSITION);
   driver.set_mode(HIP_RIGHT, wobl::real::ServoDriver::POSITION);
@@ -110,6 +110,7 @@ int main(int, char **) {
   double last_state_publish_time = 0.0;
 
   if (!initialize(driver, msg_state)) {
+    enable_servos(driver, false, true);
     return -1;
   }
 
@@ -128,15 +129,18 @@ int main(int, char **) {
             continue;
 
           u8 id = servo_ids[i];
+          std::cout << "[SERVO] Commanding servo ID " << static_cast<int>(id)
+                    << " to pos " << msg_command.position(i) << " rad, vel "
+                    << msg_command.velocity(i) << " rps" << std::endl;
           float mirror_scalar =
               (id == HIP_RIGHT || id == WHEEL_RIGHT) ? 1.0f : -1.0f;
-          if (id == HIP_LEFT || id == HIP_RIGHT) {
+          /*if (id == HIP_LEFT || id == HIP_RIGHT) {
             driver.write_position(id, mirror_scalar * msg_command.position(i),
                                   msg_command.velocity(i), 0.2);
           } else if (id == WHEEL_LEFT || id == WHEEL_RIGHT) {
             driver.write_velocity(id, mirror_scalar * msg_command.velocity(i),
                                   0.35);
-          }
+          }*/
         }
         msg_command_prev.CopyFrom(msg_command);
 

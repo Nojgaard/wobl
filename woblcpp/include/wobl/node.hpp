@@ -40,6 +40,6 @@ namespace wobl {
         std::vector<zenoh::Subscriber<void>> subscribers_;
         std::vector<std::unique_ptr<std::thread>> timer_threads_;
         std::atomic<bool> is_open_;
-        mutable std::recursive_mutex mutex_;  // Protect shared state
+        mutable std::mutex mutex_;  // Protect shared state
     };
 }

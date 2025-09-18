@@ -91,7 +91,7 @@ int Node::add_sub(const std::string &key,
 {
     auto callback = [this, message](const zenoh::Sample &sample)
     {
-        std::lock_guard<std::recursive_mutex> lock(this->mutex_);
+        std::lock_guard<std::mutex> lock(this->mutex_);
         auto &payload = sample.get_payload();
 
         if (payload.size() == 0)
@@ -132,7 +132,7 @@ void Node::add_timer(std::function<void()> callback, double frequency_hz)
         while (is_open())
         {
             {
-                std::lock_guard<std::recursive_mutex> lock(this->mutex_);
+                std::lock_guard<std::mutex> lock(this->mutex_);
                 callback();
             } // Lock is released here
 
