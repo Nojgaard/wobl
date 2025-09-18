@@ -86,7 +86,7 @@ class Controller:
             + k_velocity * fwd_velocity
             + k_position * self.integral_error
         )
-        ctrl_yaw_rate = self.yaw_rate.value - cmd_yaw_rate
+        ctrl_yaw_rate = cmd_yaw_rate
 
         ctrl_left_rps, ctrl_right_rps = self.diff_drive.inverse_kinematics(
             ctrl_fwd_velocity, ctrl_yaw_rate
