@@ -24,7 +24,9 @@ uint8_t maxim_crc8(uint8_t *data, unsigned int size) {
   return crc;
 }
 
-DDSM315Driver::DDSM315Driver(std::string port) : port_fd_(-1) {}
+DDSM315Driver::DDSM315Driver(std::string port) : port_fd_(-1) {
+    open_port(port);
+}
 
 DDSM315Driver::~DDSM315Driver() { close_port(); }
 

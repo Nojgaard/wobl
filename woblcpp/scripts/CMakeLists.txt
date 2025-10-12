@@ -5,6 +5,7 @@ set(SCRIPT_EXECUTABLES
 	servo_node
 	servo_ping
 	servo_set_id
+	ddsm_ping
 	test_publisher
 	test_subscriber
 )
