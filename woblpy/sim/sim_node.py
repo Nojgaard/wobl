@@ -63,8 +63,15 @@ class SimNode(Node):
         self.send(self.joint_state_pub, joint_state)
 
         cmd = self.joint_command
+        resolution = 0.105
+        quantized_velocity = np.round(np.array(cmd.velocity) / resolution) * resolution
         action = np.array(
-            [cmd.position[0], cmd.position[1], cmd.velocity[2], cmd.velocity[3]]
+            [
+                cmd.position[0],
+                cmd.position[1],
+                quantized_velocity[2],
+                quantized_velocity[3],
+            ]
         )
         return action
 
