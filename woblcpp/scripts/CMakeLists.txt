@@ -12,5 +12,5 @@ set(SCRIPT_EXECUTABLES
 
 foreach(EXE ${SCRIPT_EXECUTABLES})
 	add_executable(${EXE} ${EXE}.cpp)
-	target_link_libraries(${EXE} PUBLIC woblcpp)
+	target_link_libraries(${EXE} PRIVATE woblcpp)
 endforeach()

@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
   }
 
   std::cout << "Initializing servo driver...\n";
-  DDSM315Driver driver("/dev/pts/9");
+  DDSM315Driver driver;
   if (!driver.is_port_open()) {
     std::cerr << "Failed to initialize driver\n";
     return -1;
