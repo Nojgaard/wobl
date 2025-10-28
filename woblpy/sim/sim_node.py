@@ -58,7 +58,12 @@ class SimNode(Node):
             velocity=timestep.observation["robot/joint_velocities"],
             effort=timestep.observation["robot/joint_efforts"],
         )
-
+        resolution = 0.105
+        quantized_velocity = (
+            np.round(np.array(joint_state.velocity) / resolution) * resolution
+        )
+        joint_state.velocity[2] = quantized_velocity[2]
+        joint_state.velocity[3] = quantized_velocity[3]
         self.send(self.imu_pub, imu)
         self.send(self.joint_state_pub, joint_state)
 
