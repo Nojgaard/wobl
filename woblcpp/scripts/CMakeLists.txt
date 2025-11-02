@@ -10,6 +10,7 @@ set(SCRIPT_EXECUTABLES
 	ddsm_set_id
 	test_publisher
 	test_subscriber
+	motor_node
 )
 
 foreach(EXE ${SCRIPT_EXECUTABLES})

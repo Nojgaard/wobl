@@ -26,6 +26,7 @@ namespace wobl::real
             VELOCITY = 1
         };
 
+        ServoDriver(std::string port = "/dev/ttyAMA1") { port_ = port; }
         bool initialize();
         ~ServoDriver();
         bool ping(u8 servo_id);
@@ -47,7 +48,7 @@ namespace wobl::real
         int radians_to_steps(double radians) const;
 
         int baudrate_ = 1000000; // 1M baudrate
-        std::string port_ = "/dev/ttyAMA0";
+        std::string port_;
         bool is_initialized_ = false;
 
         const int STEPS_PER_REVOLUTION_ = 4096;
