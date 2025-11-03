@@ -108,3 +108,6 @@ class Node:
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
         return False
+
+    def is_open(self) -> bool:
+        return self._is_open

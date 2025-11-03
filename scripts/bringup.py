@@ -77,17 +77,29 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description="Bringup script for WOBL robot")
     parser.add_argument("mode", choices=["real", "sim"])
+    parser.add_argument(
+        "--controller",
+        choices=["default", "stand"],
+        default="default",
+        help="Choose controller type: default or stand controller",
+    )
     args = parser.parse_args()
+
+    # Define controller paths
+    controller_paths = {
+        "default": "woblpy/control/controller_node.py",
+        "stand": "woblpy/control/stand_controller_node.py",
+    }
 
     # Define commands for each mode
     commands = {
         "real": [
-            [sys.executable, "woblpy/control/controller_node.py"],
+            [sys.executable, controller_paths[args.controller]],
             ["build/woblcpp-linux/scripts/imu_node"],
             ["build/woblcpp-linux/scripts/servo_node"],
         ],
         "sim": [
-            [sys.executable, "woblpy/control/controller_node.py"],
+            [sys.executable, controller_paths[args.controller]],
             [sys.executable, "woblpy/sim/sim_node.py"],
         ],
     }
