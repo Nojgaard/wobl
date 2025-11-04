@@ -23,7 +23,7 @@ wobl::msg::JointState msg_state;
 int pub_state = -1;
 
 wobl::real::DDSM315Driver ddsm_driver("/dev/ttyAMA0");
-wobl::real::ServoDriver st_driver("/dev/ttyUSB0");
+wobl::real::ServoDriver st_driver("/dev/ttyAMA1");
 
 wobl::real::DDSM315Driver::Feedback ddsm_feedback;
 
@@ -82,18 +82,19 @@ bool begin_st_driver() {
     return false;
   }
 
+  int idx = 0;
   for (int id : {SERVO_LEFT, SERVO_RIGHT}) {
     if (!st_driver.ping(id)) {
       std::cerr << "[MOTOR] Failed to ping servo with ID " << id << std::endl;
       return false;
     }
-
     st_driver.set_mode(id, wobl::real::ServoDriver::POSITION);
     auto servo_feedback = st_driver.read_state(id);
-    st_driver.write_position(id, servo_feedback.position_rad, 1.0);
-    msg_command.set_position(id, servo_feedback.position_rad);
-    msg_command.set_velocity(id, 1.0);
+    st_driver.write_position(idx, servo_feedback.position_rad, 1.0);
+    msg_command.set_position(idx, servo_feedback.position_rad);
+    msg_command.set_velocity(idx, 1.0);
     std::cout << "[MOTOR] Servo with ID " << id << " is online" << std::endl;
+    idx++;
   }
 
   std::cout << "[MOTOR] Servo Driver initialized successfully" << std::endl;
