@@ -174,7 +174,6 @@ bool DDSM315Driver::set_rps(int id, float rps, Feedback &feedback) {
   if (bytes_written != PACKET_SIZE)
     return false;
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(1)); // wait for response
   return read_response(feedback);
 }
 
