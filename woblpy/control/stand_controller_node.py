@@ -39,7 +39,7 @@ def main():
         pub_cmd,
         JointCommand(
             position=[0.0, 0.0, 0.0, 0.0],
-            velocity=[1.0, 1.0, 0.0, 0.0],
+            velocity=[0.5, 0.5, 0.0, 0.0],
             timestamp=time.time(),
         ),
     )

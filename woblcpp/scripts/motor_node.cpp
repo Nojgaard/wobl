@@ -22,7 +22,7 @@ wobl::msg::JointState msg_state;
 
 int pub_state = -1;
 
-wobl::real::DDSM315Driver ddsm_driver("/dev/ttyAMA0");
+wobl::real::DDSM315Driver ddsm_driver("/dev/ttyACM0");
 wobl::real::ServoDriver st_driver("/dev/ttyAMA1");
 
 wobl::real::DDSM315Driver::Feedback ddsm_feedback;
@@ -94,6 +94,8 @@ bool begin_st_driver() {
     msg_command.set_position(idx, servo_feedback.position_rad);
     msg_command.set_velocity(idx, 1.0);
     std::cout << "[MOTOR] Servo with ID " << id << " is online" << std::endl;
+    std::cout << "[MOTOR]   Initial Position: "
+              << servo_feedback.position_rad << " rad" << std::endl;
     idx++;
   }
 
@@ -120,7 +122,7 @@ void actuate() {
 
     int motor_id = index_to_id[i];
     float mirror_scalar =
-        (motor_id == SERVO_RIGHT || motor_id == WHEEL_RIGHT) ? 1.0f : -1.0f;
+        (motor_id == SERVO_RIGHT || motor_id == WHEEL_LEFT) ? 1.0f : -1.0f;
     float pos = msg_command.position(i);
     float vel = msg_command.velocity(i);
     

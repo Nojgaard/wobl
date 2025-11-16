@@ -23,7 +23,7 @@ public:
     float position_rad;
   };
 
-  DDSM315Driver(std::string port = "/dev/ttyAMA0");
+  DDSM315Driver(std::string port = "/dev/ttyACM0");
   ~DDSM315Driver();
 
   bool is_port_open() const;

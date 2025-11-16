@@ -111,6 +111,7 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "csignal": "cpp"
+        "csignal": "cpp",
+        "text_encoding": "cpp"
     }
 }
