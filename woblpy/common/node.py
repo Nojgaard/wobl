@@ -70,16 +70,25 @@ class Node:
         period = 1.0 / frequency_hz
 
         def timer_loop():
-            next_call = time.time()
+            # Use monotonic clock to avoid system-time jumps,
+            # and avoid "catching up" by running many callbacks in a tight loop.
+            next_call = time.monotonic()
             while self._is_open:
-                with self._lock:
-                    callback()
+                try:
+                    with self._lock:
+                        callback()
+                except Exception as e:
+                    # Prevent an exception from killing the timer thread.
+                    print(f"[Node] Timer callback exception: {e}")
 
                 next_call += period
-                sleep_time = next_call - time.time()
-
+                sleep_time = next_call - time.monotonic()
                 if sleep_time > 0:
                     time.sleep(sleep_time)
+                else:
+                    # We're behind schedule (e.g. resumed after pause) —
+                    # reset next_call so we don't attempt to "catch up" with a burst.
+                    next_call = time.monotonic()
 
         timer_thread = threading.Thread(target=timer_loop, daemon=True)
         self._timer_threads.append(timer_thread)
