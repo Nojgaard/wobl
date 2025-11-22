@@ -1,11 +1,12 @@
 import time
+
 import numpy as np
 import zenoh
 
 from woblpy.common.node import Node
 from woblpy.control.controller import Controller
 from woblpy.messages.imu_pb2 import Imu
-from woblpy.messages.joint_pb2 import JointCommand, JointState, JointEnable
+from woblpy.messages.joint_pb2 import JointCommand, JointEnable, JointState
 
 
 class ControllerNode(Node):

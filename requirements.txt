@@ -2,3 +2,5 @@ numpy
 dm_control==1.0.31
 mujoco==3.3.5
 eclipse-zenoh
+rerun-sdk
+control

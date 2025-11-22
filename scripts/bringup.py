@@ -83,6 +83,11 @@ def main():
         default="default",
         help="Choose controller type: default or stand controller",
     )
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Start a recording process (headless in real, with viewer in sim)",
+    )
     args = parser.parse_args()
 
     # Define controller paths
@@ -103,6 +108,17 @@ def main():
             [sys.executable, "woblpy/sim/sim_node.py"],
         ],
     }
+
+    # Optionally add recording process:
+    if args.record:
+        if args.mode == "real":
+            # headless in real
+            commands["real"].append(
+                [sys.executable, "woblpy/cli/record.py", "--headless"]
+            )
+        else:
+            # not headless in sim (launch viewer)
+            commands["sim"].append([sys.executable, "woblpy/cli/record.py"])
 
     start_processes(commands[args.mode], args.mode)
 
