@@ -6,13 +6,15 @@ from scipy.spatial.transform import Rotation as R
 from woblpy.control.diff_drive_kinematics import DiffDriveKinematics
 from woblpy.control.kalman_filter import KalmanFilter
 from woblpy.control.linear_filter import LinearFilter
+from woblpy.control.lqr import compute_lqr_gains
 from woblpy.messages.imu_pb2 import Imu
 from woblpy.messages.joint_pb2 import JointCommand, JointState
 
 
 class Controller:
     def __init__(self):
-        self._k = np.array([-7.70647133, -0.87846039, 2.61800094, 1.41421356])
+        # self._k = np.array([-7.70647133, -0.87846039, 2.61800094, 1.41421356])
+        self._k = compute_lqr_gains()
         self.integral_error = 0.0
         self.offset_pitch = 0.0313
         self.last_time = time.monotonic()
@@ -26,7 +28,7 @@ class Controller:
 
         self.yaw_rate = LinearFilter(0.5, 0.0)
         self.fwd_velocity = KalmanFilter(0.001, 0.02)
-        # self.fwd_velocity = LinearFilter(0.1, 0.0)
+        # self.fwd_velocity = LinearFilter(0.2, 0.0)
 
         self.cmd_fwd_velocity = LinearFilter(0.2, 0.0)
         self.cmd_yaw_rate = LinearFilter(0.2, 0.0)
