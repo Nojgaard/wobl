@@ -19,3 +19,5 @@ build/
 *.pb.hpp
 *_pb2.py
 *_pb2.pyi
+
+data/current_recording.rrd

@@ -79,7 +79,7 @@ def main():
     parser.add_argument("mode", choices=["real", "sim"])
     parser.add_argument(
         "--controller",
-        choices=["default", "stand"],
+        choices=["default", "stand", "wheel_eval"],
         default="default",
         help="Choose controller type: default or stand controller",
     )
@@ -94,6 +94,7 @@ def main():
     controller_paths = {
         "default": "woblpy/control/controller_node.py",
         "stand": "woblpy/control/stand_controller_node.py",
+        "wheel_eval": "woblpy/control/wheel_eval_controller.py",
     }
 
     # Define commands for each mode

@@ -40,7 +40,7 @@ def main():
     rr.init("woblpy_recording", spawn=False)
     print("Rerun initialized")
 
-    rr.save("data/recording.rrd")
+    rr.save("data/current_recording.rrd")
 
     rr.log("imu/euler/roll", rr.SeriesLines(names="Roll", colors=[255, 0, 0]))
     rr.log("imu/euler/pitch", rr.SeriesLines(names="Pitch", colors=[0, 255, 0]))
