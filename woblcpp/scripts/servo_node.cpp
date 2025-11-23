@@ -151,7 +151,7 @@ int main(int, char **) {
       80);
 
   node.spin();
-  enable_servos(driver, false);
+  enable_servos(driver, false, true);
   std::cout << "[SERVO] Exiting..." << std::endl;
   return 0;
 }

@@ -14,8 +14,6 @@ enum JointToId {
 };
 int index_to_id[] = {SERVO_LEFT, SERVO_RIGHT, WHEEL_LEFT, WHEEL_RIGHT};
 
-wobl::Node node;
-
 wobl::msg::JointCommand msg_command_prev;
 wobl::msg::JointCommand msg_command;
 wobl::msg::JointState msg_state;
@@ -94,8 +92,8 @@ bool begin_st_driver() {
     msg_command.set_position(idx, servo_feedback.position_rad);
     msg_command.set_velocity(idx, 1.0);
     std::cout << "[MOTOR] Servo with ID " << id << " is online" << std::endl;
-    std::cout << "[MOTOR]   Initial Position: "
-              << servo_feedback.position_rad << " rad" << std::endl;
+    std::cout << "[MOTOR]   Initial Position: " << servo_feedback.position_rad
+              << " rad" << std::endl;
     idx++;
   }
 
@@ -110,54 +108,63 @@ bool has_pending_command(int idx) {
          msg_command.velocity(idx) != msg_command_prev.velocity(idx);
 }
 
-void actuate() {
+void actuate_servos(wobl::Node &node) {
+  for (int i = 0; i < 2; ++i) {
+    if (!has_pending_command(i))
+      continue;
+
+    int motor_id = index_to_id[i];
+    float mirror_scalar = (motor_id == SERVO_RIGHT) ? 1.0f : -1.0f;
+    float pos = msg_command.position(i);
+    float vel = msg_command.velocity(i);
+
+    st_driver.write_position(motor_id, mirror_scalar * pos, vel, 0.2);
+  }
+}
+
+void actuate_ddsm(wobl::Node &node) {
+  for (int i = 2; i < 4; ++i) {
+    int motor_id = index_to_id[i];
+    float mirror_scalar = (motor_id == WHEEL_LEFT) ? 1.0f : -1.0f;
+    float vel = msg_command.velocity(i);
+
+    ddsm_driver.set_rps(motor_id, mirror_scalar * vel, ddsm_feedback);
+
+    msg_state.set_position(i, mirror_scalar * ddsm_feedback.position_rad);
+    msg_state.set_velocity(i, mirror_scalar * ddsm_feedback.velocity_rps);
+    msg_state.set_effort(i, ddsm_feedback.current_amp);
+  }
+}
+
+void actuate_and_publish_state(wobl::Node &node) {
   if (msg_command.position_size() != 4 || msg_command.velocity_size() != 4) {
     std::cerr << "[MOTOR] Invalid command message size" << std::endl;
     return;
   }
 
-  for (int i = 0; i < 4; ++i) {
-    if (!has_pending_command(i))
-      continue;
-
-    int motor_id = index_to_id[i];
-    float mirror_scalar =
-        (motor_id == SERVO_RIGHT || motor_id == WHEEL_LEFT) ? 1.0f : -1.0f;
-    float pos = msg_command.position(i);
-    float vel = msg_command.velocity(i);
-    
-    if (motor_id == SERVO_LEFT || motor_id == SERVO_RIGHT) {
-      st_driver.write_position(motor_id, mirror_scalar * pos, vel, 0.2);
-    } else if (motor_id == WHEEL_LEFT || motor_id == WHEEL_RIGHT) {
-      ddsm_driver.set_rps(motor_id, mirror_scalar * vel, ddsm_feedback);
-
-      msg_state.set_position(i, mirror_scalar * ddsm_feedback.position_rad);
-      msg_state.set_velocity(i, mirror_scalar * ddsm_feedback.velocity_rps);
-      msg_state.set_effort(i, ddsm_feedback.current_amp);
-    }
-  }
+  actuate_servos(node);
+  actuate_ddsm(node);
 
   msg_command_prev.CopyFrom(msg_command);
-}
 
-void publish_state() {
   double now = node.clock();
   msg_state.set_timestamp(now);
+  node.send(pub_state, msg_state);
+}
 
+void update_servo_state(wobl::Node &node) {
   for (int i = 0; i < 2; ++i) {
     int motor_id = index_to_id[i];
-    float mirror_scalar =
-        (motor_id == SERVO_RIGHT || motor_id == WHEEL_RIGHT) ? 1.0f : -1.0f;
+    float mirror_scalar = (motor_id == SERVO_RIGHT) ? 1.0f : -1.0f;
     auto servo_state = st_driver.read_state(motor_id);
     msg_state.set_position(i, mirror_scalar * servo_state.position_rad);
     msg_state.set_velocity(i, mirror_scalar * servo_state.velocity_rps);
     msg_state.set_effort(i, servo_state.current_amps);
   }
-
-  node.send(pub_state, msg_state);
 }
 
 int main() {
+  wobl::Node node;
   init_msg();
   if (!begin_ddsm_driver() || !begin_st_driver()) {
     return -1;
@@ -167,8 +174,8 @@ int main() {
   pub_state = node.add_pub("joint_state");
   node.add_sub("joint_command", &msg_command);
 
-  node.add_timer(actuate, 100);
-  node.add_timer(publish_state, 50);
+  node.add_timer([&node]() { actuate_and_publish_state(node); }, 90);
+  node.add_timer([&node]() { update_servo_state(node); }, 20);
 
   node.spin();
 
