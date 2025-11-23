@@ -9,95 +9,102 @@ import time
 procs = []
 
 
-def cleanup():
-    """Gracefully shutdown all processes"""
+def cleanup(grace=5):
     if not procs:
         return
-
     print("\nShutting down processes...")
-
-    # Send SIGTERM to all processes
-    for proc in procs:
-        if proc.poll() is None:
-            proc.terminate()
-
-    # Wait for graceful shutdown
-    start_time = time.time()
-    while time.time() - start_time < 10:  # 10 second grace period
-        if all(proc.poll() is not None for proc in procs):
-            print("All processes terminated gracefully")
-            break
+    for p in list(procs):
+        if p.poll() is None:
+            try:
+                if os.name == "posix":
+                    os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+                elif os.name == "nt":
+                    try:
+                        p.send_signal(signal.CTRL_BREAK_EVENT)
+                    except Exception:
+                        p.terminate()
+                else:
+                    p.terminate()
+            except Exception:
+                try:
+                    p.kill()
+                except Exception:
+                    pass
+    deadline = time.time() + grace
+    while time.time() < deadline and any(p.poll() is None for p in procs):
         time.sleep(0.1)
-    else:
-        # Force kill remaining processes
-        for proc in procs:
-            if proc.poll() is None:
-                proc.kill()
-
+    for p in list(procs):
+        if p.poll() is None:
+            try:
+                if os.name == "posix":
+                    os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+                else:
+                    p.kill()
+            except Exception:
+                pass
     procs.clear()
     print("All processes stopped.")
 
 
-def signal_handler(sig, frame):
+def _on_signal(sig, frame):
     cleanup()
     sys.exit(0)
 
 
-def start_processes(commands, mode):
-    """Start all processes for the given mode"""
+def start_processes(cmds, mode):
     print(f"Starting {mode} mode...")
-
-    env = os.environ.copy()
-    env["WOBL_MODE"] = mode
-
-    for cmd in commands:
-        proc = subprocess.Popen(cmd, env=env, preexec_fn=os.setsid)
-        procs.append(proc)
-
+    base_env = os.environ.copy()
+    base_env["WOBL_MODE"] = mode
+    for cmd in cmds:
+        kwargs = {"env": base_env}
+        if os.name == "posix":
+            kwargs["preexec_fn"] = os.setsid
+        elif os.name == "nt":
+            kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore
+        procs.append(subprocess.Popen(cmd, **kwargs))  # type: ignore
     print("Started processes. Press Ctrl+C to stop.")
-
     try:
-        while procs:
-            # Remove dead processes
-            procs[:] = [p for p in procs if p.poll() is None]
-            time.sleep(1)
+        while any(p.poll() is None for p in procs):
+            time.sleep(0.5)
         print("All processes exited")
     except KeyboardInterrupt:
         cleanup()
 
 
 def main():
-    # Setup signal handling
     atexit.register(cleanup)
-    for sig in [signal.SIGINT, signal.SIGTERM]:
-        signal.signal(sig, signal_handler)
+    for s in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(s, _on_signal)
+        except Exception:
+            pass
     if hasattr(signal, "SIGHUP"):
-        signal.signal(signal.SIGHUP, signal_handler)
+        try:
+            signal.signal(signal.SIGHUP, _on_signal)  # type: ignore
+        except Exception:
+            pass
 
-    # Parse arguments
-    parser = argparse.ArgumentParser(description="Bringup script for WOBL robot")
-    parser.add_argument("mode", choices=["real", "sim"])
-    parser.add_argument(
+    p = argparse.ArgumentParser(description="Bringup script for WOBL robot")
+    p.add_argument("mode", choices=["real", "sim"])
+    p.add_argument(
         "--controller",
         choices=["default", "stand", "wheel_eval"],
         default="default",
         help="Choose controller type: default or stand controller",
     )
-    parser.add_argument(
+    p.add_argument(
         "--record",
         action="store_true",
         help="Start a recording process (headless in real, with viewer in sim)",
     )
-    args = parser.parse_args()
+    args = p.parse_args()
 
-    # Define controller paths
     controller_paths = {
         "default": "woblpy/control/controller_node.py",
         "stand": "woblpy/control/stand_controller_node.py",
         "wheel_eval": "woblpy/control/wheel_eval_controller.py",
     }
 
-    # Define commands for each mode
     commands = {
         "real": [
             [sys.executable, controller_paths[args.controller]],
@@ -110,16 +117,9 @@ def main():
         ],
     }
 
-    # Optionally add recording process:
     if args.record:
-        if args.mode == "real":
-            # headless in real
-            commands["real"].append(
-                [sys.executable, "woblpy/cli/record.py", "--headless"]
-            )
-        else:
-            # not headless in sim (launch viewer)
-            commands["sim"].append([sys.executable, "woblpy/cli/record.py"])
+        commands["real"].append([sys.executable, "woblpy/cli/record.py", "--headless"])
+        commands["sim"].append([sys.executable, "woblpy/cli/record.py"])
 
     start_processes(commands[args.mode], args.mode)
 
