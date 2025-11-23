@@ -128,7 +128,13 @@ void actuate_ddsm(wobl::Node &node) {
     float mirror_scalar = (motor_id == WHEEL_LEFT) ? 1.0f : -1.0f;
     float vel = msg_command.velocity(i);
 
-    ddsm_driver.set_rps(motor_id, mirror_scalar * vel, ddsm_feedback);
+    bool success = ddsm_driver.set_rps(motor_id, mirror_scalar * vel, ddsm_feedback);
+
+    if (!success) {
+      std::cerr << "[MOTOR] Warning: Failed to set velocity for DDSM315 motor with ID "
+                << motor_id << std::endl;
+      continue;
+    }
 
     msg_state.set_position(i, mirror_scalar * ddsm_feedback.position_rad);
     msg_state.set_velocity(i, mirror_scalar * ddsm_feedback.velocity_rps);
@@ -174,7 +180,7 @@ int main() {
   pub_state = node.add_pub("joint_state");
   node.add_sub("joint_command", &msg_command);
 
-  node.add_timer([&node]() { actuate_and_publish_state(node); }, 90);
+  node.add_timer([&node]() { actuate_and_publish_state(node); }, 80);
   node.add_timer([&node]() { update_servo_state(node); }, 20);
 
   node.spin();
