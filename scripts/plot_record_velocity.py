@@ -21,7 +21,7 @@ def main(argv):
         "/joint/state/velocity/right:Scalars:scalars",
     ]
 
-    recording = rr.dataframe.load_recording("data/recording.rrd")
+    recording = rr.dataframe.load_recording("data/wheel_test.rrd")
     view = recording.view(index="log_time", contents="/**").fill_latest_at()
 
     df = view.select(columns=wanted).read_pandas().reset_index()
