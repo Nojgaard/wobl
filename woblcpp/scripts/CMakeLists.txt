@@ -8,8 +8,6 @@ set(SCRIPT_EXECUTABLES
 	ddsm_ping
 	ddsm_test
 	ddsm_set_id
-	test_publisher
-	test_subscriber
 	motor_node
 )
 

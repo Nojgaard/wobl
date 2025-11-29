@@ -7,8 +7,7 @@ from woblpy.control.diff_drive_kinematics import DiffDriveKinematics
 from woblpy.control.kalman_filter import KalmanFilter
 from woblpy.control.linear_filter import LinearFilter
 from woblpy.control.lqr import compute_lqr_gains
-from woblpy.messages.imu_pb2 import Imu
-from woblpy.messages.joint_pb2 import JointCommand, JointState
+from woblpy.messages.messages_pb2 import Imu, JointCommand, JointState
 
 
 class Controller:

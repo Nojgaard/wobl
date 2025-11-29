@@ -4,8 +4,13 @@ import numpy as np
 from dm_env import TimeStep
 
 from woblpy.common.node import Node
-from woblpy.messages.imu_pb2 import Imu, Quaternion, Vector3
-from woblpy.messages.joint_pb2 import JointCommand, JointState
+from woblpy.messages.messages_pb2 import (
+    Imu,
+    JointCommand,
+    JointState,
+    Quaternion,
+    Vector3,
+)
 from woblpy.sim.application import Application
 from woblpy.sim.robot import Robot, RobotWorld
 

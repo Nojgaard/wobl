@@ -1,12 +1,10 @@
 import time
 
-import numpy as np
 import zenoh
 
 from woblpy.common.node import Node
 from woblpy.control.controller import Controller
-from woblpy.messages.imu_pb2 import Imu
-from woblpy.messages.joint_pb2 import JointCommand, JointEnable, JointState
+from woblpy.messages.messages_pb2 import ControllerState, Imu, JointCommand, JointState
 
 
 class ControllerNode(Node):
@@ -27,17 +25,9 @@ class ControllerNode(Node):
             "joint_state", callback=self.update_joint_state
         )
 
-        self.joint_enable = JointEnable(timestamp=time.time(), enable=True)
-        self.joint_enable_pub = self.add_pub("joint_enable")
-        self.send(self.joint_enable_pub, self.joint_enable)
-
         self.controller = Controller()
 
-        self.K = np.array([-7.70647133, -0.87846039, 2.61800094, 1.41421356])
-
-        self.filtered_vel = 0.0
-        self.filtered_pitch_rate = 0.0
-        self.velocity_integral = 0.0
+        self.controller_state = ControllerState()
 
         self.add_timer(self.update, frequency_hz=80.0)
 

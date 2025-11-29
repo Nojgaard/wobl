@@ -4,8 +4,7 @@ import zenoh
 from scipy.spatial.transform import Rotation as R
 
 from woblpy.common.node import Node
-from woblpy.messages.imu_pb2 import Imu
-from woblpy.messages.joint_pb2 import JointCommand, JointState
+from woblpy.messages.messages_pb2 import Imu, JointCommand, JointState
 
 imu = Imu()
 joint_state = JointState()
@@ -26,6 +25,10 @@ def on_imu(sample: zenoh.Sample):
 
 def on_joint_state(sample: zenoh.Sample):
     joint_state.ParseFromString(sample.payload.to_bytes())
+
+    rr.log("joint/state/effort/left", rr.Scalars(joint_state.effort[2]))
+    rr.log("joint/state/effort/right", rr.Scalars(joint_state.effort[3]))
+
     rr.log("joint/state/velocity/left", rr.Scalars(joint_state.velocity[2]))
     rr.log("joint/state/velocity/right", rr.Scalars(joint_state.velocity[3]))
 

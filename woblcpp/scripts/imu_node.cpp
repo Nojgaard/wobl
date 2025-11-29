@@ -1,5 +1,5 @@
 #include <iostream>
-#include <wobl/msg/imu.pb.h>
+#include <wobl/msg/messages.pb.h>
 #include <wobl/node.hpp>
 #include <wobl/real/imu_driver.hpp>
 

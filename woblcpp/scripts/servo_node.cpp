@@ -1,6 +1,6 @@
 #include <iostream>
 #include <vector>
-#include <wobl/msg/joint.pb.h>
+#include <wobl/msg/messages.pb.h>
 #include <wobl/node.hpp>
 #include <wobl/real/servo_driver.hpp>
 

@@ -1,7 +1,7 @@
 import time
 
 from woblpy.common.node import Node
-from woblpy.messages.joint_pb2 import JointCommand, JointState
+from woblpy.messages.messages_pb2 import JointCommand, JointState
 
 
 def main():

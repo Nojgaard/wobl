@@ -4,8 +4,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 from woblpy.common.node import Node
-from woblpy.messages.imu_pb2 import Imu
-from woblpy.messages.joint_pb2 import JointCommand, JointState
+from woblpy.messages.messages_pb2 import Imu, JointCommand, JointState
 
 
 def print_orientation(imu: Imu):

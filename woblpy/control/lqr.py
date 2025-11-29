@@ -13,6 +13,7 @@ def compute_lqr_gains():
     mass = 1.8909214736935442  # Mass of the robot (kg)
     com_length = 0.12300142698585038  # Height of the center of mass (m)
     gravity = 9.80665  # Acceleration due to gravity (m/s^2)
+    torque_constant = 0.37  # Motor torque constant (Nm/A)
 
     # ---- Continuous-Time State-Space Model ----
     #
@@ -59,16 +60,16 @@ def compute_lqr_gains():
     #
     Q = np.diag(
         [
-            10.0,  # θ      (most important: avoid falling)
+            5.0,  # θ      (most important: avoid falling)
             0.5,  #  θ̇      (reduce fast tipping)
-            0.0,  #  v      (light penalty to discourage runaway speed)
-            3.0,  # Integral of v (to eliminate steady-state error)
+            1.0,  #  v      (light penalty to discourage runaway speed)
+            2.5,  # Integral of v (to eliminate steady-state error)
         ]
     )
 
     # R penalizes the control effort (wheel torque).
     # Larger R → less aggressive control (reduced torque usage).
-    R = np.array([[2.5]])
+    R = np.array([[2.0]])
 
     # ---- Integral Action ----
     #
