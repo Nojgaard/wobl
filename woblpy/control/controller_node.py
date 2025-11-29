@@ -10,6 +10,9 @@ from woblpy.messages.messages_pb2 import ControllerState, Imu, JointCommand, Joi
 class ControllerNode(Node):
     def __init__(self):
         super().__init__()
+        
+        self.controller = Controller()
+        self.controller_state = ControllerState()
 
         self.joint_command_pub = self.add_pub("joint_command")
         self.joint_command = JointCommand(
@@ -25,8 +28,6 @@ class ControllerNode(Node):
             "joint_state", callback=self.update_joint_state
         )
 
-        self.controller = Controller()
-        self.controller_state = ControllerState()
         self.state_pub = self.add_pub("controller_state")
 
         self.add_timer(self.update, frequency_hz=80.0)
