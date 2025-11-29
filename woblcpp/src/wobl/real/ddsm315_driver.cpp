@@ -160,6 +160,11 @@ bool DDSM315Driver::set_rps(int id, float rps, Feedback &feedback) {
   float rps2rpm = 60.0f / (2.0f * M_PI);
   int16_t rpm = static_cast<int16_t>(std::round(rps * rps2rpm));
   rpm = std::clamp(rpm, (int16_t)-330, (int16_t)330);
+  // The acceleration time per 1rpm is 0.1ms. 
+  // When set to 1, the acceleration time per 1rpm is 0.1ms. 
+  // When set to 10, the acceleration time per 1rpm is 10*0.1ms=1ms. 
+  // When set to 0, the default value is 1, and the acceleration time per 1rpm is 0.1ms.
+  uint8_t acceleration = 2;
 
   for (int i = 0; i < PACKET_SIZE; ++i)
     packet[i] = 0;
@@ -168,6 +173,7 @@ bool DDSM315Driver::set_rps(int id, float rps, Feedback &feedback) {
   packet[1] = 0x64; // Command for setting RPS
   packet[2] = (rpm >> 8) & 0xFF;
   packet[3] = rpm & 0xFF;
+  packet[6] = acceleration;
   packet[9] = maxim_crc8(packet, PACKET_SIZE - 1);
 
   ssize_t bytes_written = write(port_fd_, packet, PACKET_SIZE);

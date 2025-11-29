@@ -23,7 +23,7 @@ class Controller:
         self.yaw = 0.0
 
         self.roll_rate = LinearFilter(0.5, 0.0)
-        self.pitch_rate = LinearFilter(0.5, 0.0)
+        self.pitch_rate = LinearFilter(0.95, 0.0)
 
         self.yaw_rate = LinearFilter(0.5, 0.0)
         self.fwd_velocity = KalmanFilter(0.001, 0.02)

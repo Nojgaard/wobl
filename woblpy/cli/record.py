@@ -22,6 +22,11 @@ def on_imu(sample: zenoh.Sample):
     roll, pitch, yaw = rpy
     rr.log("imu/euler/roll", rr.Scalars(roll))
     rr.log("imu/euler/pitch", rr.Scalars(pitch))
+    rr.log("imu/euler/yaw", rr.Scalars(yaw))
+
+    rr.log("imu/euler/roll_rate", rr.Scalars(imu.angular_velocity.x))
+    rr.log("imu/euler/pitch_rate", rr.Scalars(imu.angular_velocity.y))
+    rr.log("imu/euler/yaw_rate", rr.Scalars(imu.angular_velocity.z))
 
 
 def on_joint_state(sample: zenoh.Sample):
