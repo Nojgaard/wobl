@@ -4,11 +4,12 @@ import zenoh
 from scipy.spatial.transform import Rotation as R
 
 from woblpy.common.node import Node
-from woblpy.messages.messages_pb2 import Imu, JointCommand, JointState
+from woblpy.messages.messages_pb2 import ControllerState, Imu, JointCommand, JointState
 
 imu = Imu()
 joint_state = JointState()
 joint_command = JointCommand()
+controller_state = ControllerState()
 
 
 def on_imu(sample: zenoh.Sample):
@@ -37,6 +38,20 @@ def on_joint_command(sample: zenoh.Sample):
     joint_command.ParseFromString(sample.payload.to_bytes())
     rr.log("joint/command/velocity/left", rr.Scalars(joint_command.velocity[2]))
     rr.log("joint/command/velocity/right", rr.Scalars(joint_command.velocity[3]))
+
+
+def on_controller_state(sample: zenoh.Sample):
+    controller_state.ParseFromString(sample.payload.to_bytes())
+
+    rr.log(
+        "controller/state/fwd_velocity", rr.Scalars(controller_state.tar_fwd_velocity)
+    )
+    rr.log("controller/state/yaw_rate", rr.Scalars(controller_state.tar_yaw_rate))
+
+    rr.log("controller/state/pitch", rr.Scalars(controller_state.orientation.y))
+    rr.log(
+        "controller/state/pitch_rate", rr.Scalars(controller_state.angular_velocity.y)
+    )
 
 
 def main():
@@ -68,6 +83,7 @@ def main():
         node.add_sub("imu", callback=on_imu)
         node.add_sub("joint_state", callback=on_joint_state)
         node.add_sub("joint_command", callback=on_joint_command)
+        node.add_sub("controller_state", callback=on_controller_state)
         node.spin()
     print("Node shut down")
 

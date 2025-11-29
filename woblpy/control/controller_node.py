@@ -26,8 +26,8 @@ class ControllerNode(Node):
         )
 
         self.controller = Controller()
-
         self.controller_state = ControllerState()
+        self.state_pub = self.add_pub("controller_state")
 
         self.add_timer(self.update, frequency_hz=80.0)
 
@@ -39,6 +39,24 @@ class ControllerNode(Node):
         self.joint_state.ParseFromString(sample.payload.to_bytes())
         self.controller.update_joint_state(self.joint_state)
 
+    def publish_controller_state(self):
+        controller = self.controller
+        state = self.controller_state
+        state.timestamp = time.time()
+
+        state.orientation.x = controller.roll
+        state.orientation.y = controller.pitch
+
+        state.angular_velocity.x = controller.roll_rate.value
+        state.angular_velocity.y = controller.pitch_rate.value
+
+        state.tar_fwd_velocity = controller.fwd_velocity.value
+        state.tar_yaw_rate = controller.yaw_rate.value
+
+        state.cmd_fwd_velocity = controller.ctrl_velocity
+        state.cmd_yaw_rate = controller.ctrl_yaw_rate
+        self.send(self.state_pub, state)
+
     def update(self):
         if self.imu.timestamp == 0 or self.joint_state.timestamp == 0:
             return
@@ -47,6 +65,8 @@ class ControllerNode(Node):
         self.controller.update(joint_command)
         joint_command.timestamp = time.time()
         self.send(self.joint_command_pub, joint_command)
+
+        self.publish_controller_state()
 
 
 if __name__ == "__main__":
