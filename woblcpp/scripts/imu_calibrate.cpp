@@ -3,7 +3,7 @@
 #include <math.h>
 #include <thread>
 #include <vector>
-#include <wobl/msg/imu.pb.h>
+#include <wobl/msg/messages.pb.h>
 #include <wobl/real/imu_driver.hpp>
 
 using namespace wobl::real;

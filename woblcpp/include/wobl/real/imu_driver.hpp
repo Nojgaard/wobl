@@ -2,7 +2,7 @@
 
 #include <ICM_20948.h>
 #include <array>
-#include <wobl/msg/imu.pb.h>
+#include <wobl/msg/messages.pb.h>
 
 namespace wobl::real
 {
