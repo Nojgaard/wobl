@@ -164,7 +164,7 @@ bool DDSM315Driver::set_rps(int id, float rps, Feedback &feedback) {
   // When set to 1, the acceleration time per 1rpm is 0.1ms. 
   // When set to 10, the acceleration time per 1rpm is 10*0.1ms=1ms. 
   // When set to 0, the default value is 1, and the acceleration time per 1rpm is 0.1ms.
-  uint8_t acceleration = 2;
+  uint8_t acceleration = 0;
 
   for (int i = 0; i < PACKET_SIZE; ++i)
     packet[i] = 0;

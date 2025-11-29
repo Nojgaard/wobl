@@ -16,6 +16,7 @@ class Controller:
         self._k = compute_lqr_gains()
         self.integral_error = 0.0
         self.offset_pitch = 0.0313
+        #self.offset_pitch = 0.04
         self.last_time = time.monotonic()
 
         self.roll = 0.0
@@ -23,7 +24,8 @@ class Controller:
         self.yaw = 0.0
 
         self.roll_rate = LinearFilter(0.5, 0.0)
-        self.pitch_rate = LinearFilter(0.95, 0.0)
+        self.pitch_rate = LinearFilter(0.5, 0.0)
+        #self.pitch_rate = KalmanFilter(0.1, 0.02)
 
         self.yaw_rate = LinearFilter(0.5, 0.0)
         self.fwd_velocity = KalmanFilter(0.001, 0.02)
@@ -34,6 +36,7 @@ class Controller:
 
         self.ctrl_velocity = 0.0
         self.ctrl_yaw_rate = 0.0
+        self.last_ctrl_velocity = 0.0
 
         self.diff_drive = DiffDriveKinematics(0.3, 0.04, 10.0)
 
@@ -63,6 +66,20 @@ class Controller:
         if dt <= 0 or dt > 0.5:
             dt = 0.02
         return dt
+    
+    def update_velocity(self, v, v_target, dt, a_max, k=2.0):
+        # Compute desired acceleration (spring-like toward target)
+        a = k * (v_target - v)
+
+        # Clamp acceleration to max limits
+        if a > a_max:
+            a = a_max
+        elif a < -a_max:
+            a = -a_max
+
+        # Update velocity
+        v_new = v + a * dt
+        return v_new
 
     def update(self, joint_command: JointCommand):
         k_pitch = self._k[0]
@@ -73,6 +90,7 @@ class Controller:
         cmd_fwd_velocity = self.cmd_fwd_velocity.value
         cmd_yaw_rate = self.cmd_yaw_rate.value
 
+        last_pitch = self.pitch
         pitch = self.pitch - self.offset_pitch
         pitch_rate = self.pitch_rate.value
 
@@ -82,6 +100,9 @@ class Controller:
         self.integral_error += fwd_velocity * dt
         self.integral_error = np.clip(self.integral_error, -0.2, 0.2)
 
+        #self.pitch_rate.update((self.pitch - last_pitch) / dt)
+        #pitch_rate = self.pitch_rate.value
+
         ctrl_fwd_velocity = (
             -k_pitch * pitch
             - k_pitch_rate * pitch_rate
@@ -89,6 +110,9 @@ class Controller:
             + k_position * self.integral_error
         )
         ctrl_yaw_rate = cmd_yaw_rate
+
+        ctrl_fwd_velocity = self.update_velocity(self.last_ctrl_velocity, ctrl_fwd_velocity, dt, a_max=5.0, k=3.0)
+        self.last_ctrl_velocity = ctrl_fwd_velocity
 
         ctrl_left_rps, ctrl_right_rps = self.diff_drive.inverse_kinematics(
             ctrl_fwd_velocity, ctrl_yaw_rate

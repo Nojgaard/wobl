@@ -60,10 +60,10 @@ def compute_lqr_gains():
     #
     Q = np.diag(
         [
-            5.0,  # θ      (most important: avoid falling)
-            0.5,  #  θ̇      (reduce fast tipping)
-            1.0,  #  v      (light penalty to discourage runaway speed)
-            2.5,  # Integral of v (to eliminate steady-state error)
+            3.0,  # θ      (most important: avoid falling)
+            0.1,  #  θ̇      (reduce fast tipping)
+            1.5,  #  v      (light penalty to discourage runaway speed)
+            1.0,  # Integral of v (to eliminate steady-state error)
         ]
     )
 
