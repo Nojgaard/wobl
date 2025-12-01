@@ -31,6 +31,7 @@ public:
   bool ping(int id);
   bool set_mode(int id, Mode mode);
   bool set_id(int new_id);
+  bool set_current(int id, float current_amp, Feedback &feedback); // -0.8 ~ 0.8 A
   bool set_rps(int id, float rps, Feedback &feedback); // -35 ~ 35 rps
   bool get_feedback(int id, Feedback &feedback);
 

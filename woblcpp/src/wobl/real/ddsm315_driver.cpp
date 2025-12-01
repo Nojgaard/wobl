@@ -183,6 +183,33 @@ bool DDSM315Driver::set_rps(int id, float rps, Feedback &feedback) {
   return read_response(feedback);
 }
 
+bool DDSM315Driver::set_current(int id, float current_amp, Feedback &feedback) {
+  if (!is_port_open()) {
+    return false;
+  }
+  uint8_t acceleration = 0;
+
+  current_amp = std::clamp(current_amp, -0.8f, 0.8f);
+  float current2lsb = 32767.0f / 8.0f; // 4095.875 LSB/A
+  int16_t current_lsb = static_cast<int16_t>(std::round(current_amp * current2lsb));
+
+  for (int i = 0; i < PACKET_SIZE; ++i)
+    packet[i] = 0;
+
+  packet[0] = id;
+  packet[1] = 0x64; // Command for setting RPS
+  packet[2] = (current_lsb >> 8) & 0xFF;
+  packet[3] = current_lsb & 0xFF;
+  packet[6] = acceleration;
+  packet[9] = maxim_crc8(packet, PACKET_SIZE - 1);
+
+  ssize_t bytes_written = write(port_fd_, packet, PACKET_SIZE);
+  if (bytes_written != PACKET_SIZE)
+    return false;
+
+  return read_response(feedback);
+}
+
 bool DDSM315Driver::get_feedback(int id, Feedback &feedback) {
   return set_rps(id, 0.0f, feedback);
 }
