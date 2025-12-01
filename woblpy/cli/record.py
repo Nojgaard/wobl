@@ -61,9 +61,10 @@ def on_controller_state(sample: zenoh.Sample):
 
 def main():
     rr.init("woblpy_recording", spawn=False)
-    print("Rerun initialized")
+    server_uri = rr.serve_grpc()
+    print("Rerun initialized:", server_uri)
 
-    rr.save("data/current_recording.rrd")
+    # rr.save("data/current_recording.rrd")
 
     rr.log("imu/euler/roll", rr.SeriesLines(names="Roll", colors=[255, 0, 0]))
     rr.log("imu/euler/pitch", rr.SeriesLines(names="Pitch", colors=[0, 255, 0]))
@@ -84,6 +85,7 @@ def main():
         "joint/state/velocity/right",
         rr.SeriesLines(names="Right State Velocity", colors=[255, 165, 0]),
     )
+
     with Node() as node:
         node.add_sub("imu", callback=on_imu)
         node.add_sub("joint_state", callback=on_joint_state)
