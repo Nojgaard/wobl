@@ -62,7 +62,7 @@
                         </body>
                         <body name="R_foot">
                             <joint name="R_foot" pos="-0.0177 -0.000838 -0.193474" />
-                            <geom mesh="R_foot" mass="0.1" contype="0" conaffinity="0" />
+                            <geom mesh="R_foot" mass="0.35" contype="0" conaffinity="0" />
                             <geom pos="-0.045 -0.000838 -0.193474" class="foot_collider" />
                         </body>
                     </body>
@@ -85,7 +85,7 @@
                         </body>
                         <body name="L_foot">
                             <joint name="L_foot" pos="-0.0177 -0.000838 -0.193474" />
-                            <geom mesh="L_foot" mass="0.1" contype="0" conaffinity="0" />
+                            <geom mesh="L_foot" mass="0.35" contype="0" conaffinity="0" />
                             <geom pos="0.045 -0.000838 -0.193474" class="foot_collider" />
                         </body>
                     </body>

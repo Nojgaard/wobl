@@ -10,11 +10,11 @@ def compute_lqr_gains():
     """
 
     # ---- System Dynamics Parameters ----
-    mass = 1.8909214736935442  # Mass of the robot (kg)
-    com_length = 0.12300142698585038  # Height of the center of mass (m)
+    mass = 2.3909  # Mass of the robot (kg)
+    com_length = 0.09779  # Height of the center of mass (m)
     gravity = 9.80665  # Acceleration due to gravity (m/s^2)
-    torque_constant = 0.37  # Motor torque constant (Nm/A)
-
+    # torque_constant = 0.37  # Motor torque constant (Nm/A)
+    kt = 0.0002133174682914169  # Nm per (rad/s) friction coefficient
     # ---- Continuous-Time State-Space Model ----
     #
     # We approximate the robot as a single inverted pendulum on wheels.
