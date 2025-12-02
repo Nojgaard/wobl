@@ -1,8 +1,6 @@
-#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <fcntl.h>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <termios.h>
@@ -12,103 +10,92 @@
 #include <wobl/real/ddsm315_driver.hpp>
 
 using namespace wobl::real;
-using clock = std::chrono::steady_clock;
 
 constexpr double KI = 0.37; // Motor torque constant (Nm/A)
+constexpr double WHEEL_MASS = 0.35; // kg
+constexpr double WHEEL_RADIUS = 0.04; // m
 
-struct TestConfig {
-  std::vector<float> currents_A = {0.0f, 0.05f, 0.1f, 0.2f, -0.2f, 0.0f};
-  std::vector<int> durations_s = {2, 3, 3, 3, 3, 2};
-};
+// Calculate wheel moment of inertia (solid disk approximation)
+constexpr double WHEEL_INERTIA = 0.5 * WHEEL_MASS * WHEEL_RADIUS * WHEEL_RADIUS;
 
 struct TerminalGuard {
-  termios orig_state;
+  termios orig;
   TerminalGuard() {
-    tcgetattr(STDIN_FILENO, &orig_state);
-    termios new_state = orig_state;
-    new_state.c_lflag &= ~(ICANON | ECHO);
-    new_state.c_cc[VMIN] = 0;
-    tcsetattr(STDIN_FILENO, TCSANOW, &new_state);
-    fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
+    tcgetattr(STDIN_FILENO, &orig);
+    termios raw = orig;
+    raw.c_lflag &= ~(ICANON | ECHO);
+    raw.c_cc[VMIN] = 0;
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+    fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
   }
-  ~TerminalGuard() { tcsetattr(STDIN_FILENO, TCSANOW, &orig_state); }
+  ~TerminalGuard() { tcsetattr(STDIN_FILENO, TCSANOW, &orig); }
 };
 
-struct TestMetrics {
-  double target_current = 0.0;
-  double actual_current = 0.0;
-  double velocity_rps = 0.0;
-  double estimated_torque = 0.0;
-  double current_error = 0.0;
-  double timestamp = 0.0;
-  double acceleration_rps2 = 0.0; // Add acceleration
-  
-  void calculate(float target_A, const DDSM315Driver::Feedback& fb, double time_s, double prev_vel = 0.0, double dt = 0.01) {
-    target_current = target_A;
-    actual_current = fb.current_amp;
-    velocity_rps = fb.velocity_rps;
-    estimated_torque = KI * actual_current;
-    current_error = std::abs(target_current - actual_current);
-    timestamp = time_s;
-    acceleration_rps2 = (velocity_rps - prev_vel) / dt;
-  }
-  
-  void print() const {
-    std::cout << std::fixed << std::setprecision(3)
-              << "T:" << std::setw(6) << target_current << "A"
-              << " | Act:" << std::setw(6) << actual_current << "A"
-              << " | Err:" << std::setw(5) << current_error << "A"
-              << " | RPS:" << std::setw(7) << velocity_rps
-              << " | τ:" << std::setw(7) << estimated_torque << "Nm"
-              << " | α:" << std::setw(7) << acceleration_rps2 << "rps²\n";
-  }
-};
-
-bool checkEmergencyStop() {
+bool check_quit() {
   char c;
-  return (read(STDIN_FILENO, &c, 1) > 0 && c == 'q');
+  return read(STDIN_FILENO, &c, 1) > 0 && c == 'q';
 }
 
-struct ConstantCalibration {
-  double estimated_inertia = 0.0; // kg·m²
-  double estimated_kt = 0.0;      // Nm/A
-  int samples = 0;
+void print_status(double t, float target, const DDSM315Driver::Feedback& fb) {
+  double torque = KI * fb.current_amp;
+  double error = std::abs(target - fb.current_amp);
   
-  void accumulate(const TestMetrics& m, double prev_vel) {
-    // During acceleration phases with minimal load, estimate J and Kt
-    // τ_motor = τ_load + J·α
-    // If load is small: τ_motor ≈ J·α
-    // Kt·I ≈ J·α  →  Kt ≈ J·α/I
+  std::cout << std::fixed << std::setprecision(3)
+            << "t:" << std::setw(5) << t << "s"
+            << " | I_tgt:" << std::setw(5) << target << "A"
+            << " | I_act:" << std::setw(5) << fb.current_amp << "A"
+            << " | err:" << std::setw(5) << error << "A"
+            << " | ω:" << std::setw(6) << fb.velocity_rps << "rps"
+            << " | τ:" << std::setw(6) << torque << "Nm\n";
+}
+
+void calibrate_kt(const std::vector<float>& currents, 
+                  const std::vector<DDSM315Driver::Feedback>& feedbacks,
+                  const std::vector<double>& times) {
+  if (feedbacks.size() < 2) return;
+  
+  double sum_kt = 0.0;
+  int valid_samples = 0;
+  
+  for (size_t i = 1; i < feedbacks.size(); ++i) {
+    double dt = times[i] - times[i-1];
+    if (dt <= 0) continue;
     
-    if (std::abs(m.actual_current) > 0.05 && std::abs(m.acceleration_rps2) > 0.1) {
-      // Skip first phase (settling)
-      double angular_accel = m.acceleration_rps2 * 2.0 * M_PI; // rad/s²
+    double dw = feedbacks[i].velocity_rps - feedbacks[i-1].velocity_rps;
+    double alpha = (dw * 2.0 * M_PI) / dt; // angular acceleration (rad/s²)
+    
+    double avg_current = (feedbacks[i].current_amp + feedbacks[i-1].current_amp) / 2.0;
+    
+    // During acceleration with current applied
+    if (std::abs(avg_current) > 0.05 && std::abs(alpha) > 1.0) {
+      // τ_motor = J_wheel * α  (neglecting friction during transients)
+      // Kt * I = J_wheel * α
+      // Kt = (J_wheel * α) / I
       
-      // Estimate motor constant from power balance
-      // Assuming small friction: Kt ≈ τ/I
-      double kt_sample = m.estimated_torque / m.actual_current;
+      double kt_sample = (WHEEL_INERTIA * alpha) / avg_current;
       
-      estimated_kt += kt_sample;
-      samples++;
+      // Filter outliers
+      if (kt_sample > 0.1 && kt_sample < 1.0) {
+        sum_kt += kt_sample;
+        valid_samples++;
+      }
     }
   }
   
-  void finalize() {
-    if (samples > 0) {
-      estimated_kt /= samples;
-    }
-  }
-  
-  void print() const {
-    std::cout << "\n=== Constant Calibration ===\n";
+  if (valid_samples > 0) {
+    double estimated_kt = sum_kt / valid_samples;
+    std::cout << "\n=== Kt Calibration ===\n";
+    std::cout << "Wheel inertia: " << WHEEL_INERTIA << " kg·m²\n";
     std::cout << "Estimated Kt: " << std::fixed << std::setprecision(4) 
-              << estimated_kt << " Nm/A (assumed: " << KI << " Nm/A)\n";
-    std::cout << "Deviation: " << std::fixed << std::setprecision(2)
+              << estimated_kt << " Nm/A\n";
+    std::cout << "Assumed Kt: " << KI << " Nm/A\n";
+    std::cout << "Deviation: " << std::fixed << std::setprecision(1)
               << ((estimated_kt / KI - 1.0) * 100.0) << "%\n";
-    std::cout << "Calibration samples: " << samples << "\n";
-    std::cout << "\nNote: For accurate Kt/J estimation, apply known external load\n";
+    std::cout << "Valid samples: " << valid_samples << "\n";
+  } else {
+    std::cout << "Insufficient data for Kt calibration\n";
   }
-};
+}
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
@@ -118,21 +105,19 @@ int main(int argc, char *argv[]) {
 
   int motor_id = std::atoi(argv[1]);
   if (motor_id < 0 || motor_id > 254) {
-    std::cerr << "Invalid motor_id: " << motor_id << "\n";
+    std::cerr << "Invalid motor_id\n";
     return 1;
   }
 
-  TestConfig config;
-  if (config.currents_A.size() != config.durations_s.size()) {
-    std::cerr << "Configuration error: mismatched array sizes\n";
-    return 1;
-  }
+  // Test sequence
+  const std::vector<float> currents = {0.0f, 0.05f, 0.1f, 0.2f, -0.2f, 0.0f};
+  const std::vector<int> durations = {2, 3, 3, 3, 3, 2};
 
-  // Initialize driver
-  std::cout << "Initializing servo driver...\n";
+  // Initialize
+  std::cout << "Initializing motor " << motor_id << "...\n";
   DDSM315Driver driver;
   if (!driver.is_port_open() || !driver.ping(motor_id)) {
-    std::cerr << "Failed to connect to motor " << motor_id << "\n";
+    std::cerr << "Failed to connect\n";
     return 1;
   }
 
@@ -141,92 +126,72 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // Setup terminal and timing
-  TerminalGuard terminal_guard;
-  std::cout << "Press 'q' for emergency stop\n";
-  std::cout << "KI constant: " << KI << " Nm/A\n\n";
+  TerminalGuard term;
+  std::cout << "Press 'q' to stop. KI = " << KI << " Nm/A\n\n";
 
-  const auto write_period = std::chrono::milliseconds(10);
-  const auto print_period = std::chrono::milliseconds(100);
+  const auto dt_control = std::chrono::milliseconds(10);
+  const auto dt_print = std::chrono::milliseconds(100);
   
-  auto test_start = clock::now();
-  auto last_print = test_start;
-  
-  long total_duration = 0;
-  for (int d : config.durations_s) total_duration += d;
+  auto t_start = std::chrono::steady_clock::now();
+  auto t_last_print = t_start;
 
   DDSM315Driver::Feedback fb;
-  TestMetrics metrics;
-  std::vector<TestMetrics> summary;
-  ConstantCalibration calibration;
-  
-  double prev_velocity = 0.0;
-  auto prev_time = test_start;
+  double sum_error = 0.0;
+  int samples = 0;
 
-  // Main test loop
+  std::vector<DDSM315Driver::Feedback> feedback_log;
+  std::vector<float> current_log;
+  std::vector<double> time_log;
+
+  // Main loop
   while (true) {
-    if (checkEmergencyStop()) {
-      std::cout << "\nEmergency stop!\n";
+    if (check_quit()) {
+      std::cout << "\nStopping...\n";
       driver.set_current(motor_id, 0.0f, fb);
       break;
     }
 
-    auto now = clock::now();
-    double dt = std::chrono::duration<double>(now - prev_time).count();
-    
-    auto elapsed_s = std::chrono::duration_cast<std::chrono::seconds>(now - test_start).count();
-    if (elapsed_s >= total_duration) break;
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - t_start).count();
 
-    // Find current test phase
-    long accum = 0;
+    // Find current phase
+    int total = 0;
     size_t phase = 0;
-    for (; phase < config.durations_s.size(); ++phase) {
-      if (elapsed_s < accum + config.durations_s[phase]) break;
-      accum += config.durations_s[phase];
+    for (; phase < durations.size(); ++phase) {
+      if (elapsed < total + durations[phase]) break;
+      total += durations[phase];
+    }
+    if (phase >= durations.size()) break;
+
+    float target = currents[phase];
+    driver.set_current(motor_id, target, fb);
+
+    // Log for calibration
+    double t = std::chrono::duration<double>(now - t_start).count();
+    feedback_log.push_back(fb);
+    current_log.push_back(target);
+    time_log.push_back(t);
+
+    // Statistics
+    sum_error += std::abs(target - fb.current_amp);
+    samples++;
+
+    // Print periodically
+    if (now - t_last_print >= dt_print) {
+      double t = std::chrono::duration<double>(now - t_start).count();
+      print_status(t, target, fb);
+      t_last_print = now;
     }
 
-    float target_A = config.currents_A[phase];
-    
-    if (!driver.set_current(motor_id, target_A, fb)) {
-      std::cerr << "Warning: set_current failed\n";
-    }
-
-    // Calculate metrics
-    double time_s = std::chrono::duration<double>(now - test_start).count();
-    metrics.calculate(target_A, fb, time_s, prev_velocity, dt);
-
-    // Accumulate calibration data
-    calibration.accumulate(metrics, prev_velocity);
-
-    // Print status
-    if (now - last_print >= print_period) {
-      metrics.print();
-      last_print = now;
-    }
-    
-    summary.push_back(metrics);
-    prev_velocity = fb.velocity_rps;
-    prev_time = now;
-    std::this_thread::sleep_for(write_period);
+    std::this_thread::sleep_for(dt_control);
   }
 
-  // Print summary statistics
-  if (!summary.empty()) {
-    double avg_error = 0.0, max_error = 0.0;
-    for (const auto& m : summary) {
-      avg_error += m.current_error;
-      max_error = std::max(max_error, m.current_error);
-    }
-    avg_error /= summary.size();
+  // Summary
+  if (samples > 0) {
+    std::cout << "\nAvg error: " << (sum_error / samples) << " A over " 
+              << samples << " samples\n";
     
-    std::cout << "\n=== Test Summary ===\n";
-    std::cout << "Samples: " << summary.size() << "\n";
-    std::cout << "Avg current error: " << avg_error << " A\n";
-    std::cout << "Max current error: " << max_error << " A\n";
-    std::cout << "KI constant used: " << KI << " Nm/A\n";
-    
-    calibration.finalize();
-    calibration.print();
+    calibrate_kt(current_log, feedback_log, time_log);
   }
 
   return 0;
