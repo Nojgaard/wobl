@@ -9,6 +9,7 @@ set(SCRIPT_EXECUTABLES
 	ddsm_test
 	ddsm_set_id
 	motor_node
+	ddsm_torque_test
 )
 
 foreach(EXE ${SCRIPT_EXECUTABLES})
