@@ -13,7 +13,7 @@ using namespace wobl::real;
 
 constexpr double KI = 0.37; // Motor torque constant (Nm/A)
 constexpr double WHEEL_MASS = 0.35; // kg
-constexpr double WHEEL_RADIUS = 0.04; // m
+constexpr double WHEEL_RADIUS = 0.039; // m
 
 // Calculate wheel moment of inertia (solid disk approximation)
 constexpr double WHEEL_INERTIA = 0.5 * WHEEL_MASS * WHEEL_RADIUS * WHEEL_RADIUS;
@@ -109,9 +109,17 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // Test sequence
-  const std::vector<float> currents = {0.0f, 0.05f, 0.1f, 0.2f, -0.2f, 0.0f};
-  const std::vector<int> durations = {2, 3, 3, 3, 3, 2};
+  // Calibration sequence - optimized for Kt estimation
+  const std::vector<float> currents = {
+    0.0f,   // 2s - settle/zero
+    0.3f,   // 3s - strong acceleration 
+    0.0f,   // 2s - coast down (measure friction)
+    0.5f,   // 3s - maximum safe acceleration
+    0.0f,   // 2s - coast down
+    -0.3f,  // 3s - reverse acceleration
+    0.0f    // 2s - final settle
+  };
+  const std::vector<int> durations = {2, 3, 2, 3, 2, 3, 2};
 
   // Initialize
   std::cout << "Initializing motor " << motor_id << "...\n";
