@@ -17,7 +17,7 @@ using clock = std::chrono::steady_clock;
 constexpr double KI = 0.37; // Motor torque constant (Nm/A)
 
 struct TestConfig {
-  std::vector<float> currents_A = {0.0f, 0.1f, 0.2f, 0.3f, -0.2f, 0.0f};
+  std::vector<float> currents_A = {0.0f, 0.05f, 0.1f, 0.2f, -0.2f, 0.0f};
   std::vector<int> durations_s = {2, 3, 3, 3, 3, 2};
 };
 
