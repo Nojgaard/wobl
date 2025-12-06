@@ -104,6 +104,7 @@ bool DDSM315Driver::set_mode(int id, Mode mode) {
 }
 
 bool DDSM315Driver::read_response(Feedback &feedback) {
+  tcflush(port_fd_, TCIFLUSH);
   ssize_t bytes_read = read(port_fd_, packet, PACKET_SIZE);
   if (bytes_read != PACKET_SIZE) {
     return false;

@@ -116,6 +116,7 @@ void actuate_servos(wobl::Node &node) {
       continue;
 
     int motor_id = index_to_id[i];
+    std::cout << "[MOTOR] Actuating servo ID " << motor_id << std::endl;
     float mirror_scalar = (motor_id == SERVO_RIGHT) ? 1.0f : -1.0f;
     float pos = msg_command.position(i);
     float vel = msg_command.velocity(i);
@@ -132,7 +133,6 @@ void actuate_ddsm(wobl::Node &node) {
 
     bool success = ddsm_driver.set_current(motor_id, mirror_scalar * (vel * WHEEL_KT), ddsm_feedback);
     // bool success = ddsm_driver.set_rps(motor_id, mirror_scalar * vel, ddsm_feedback);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
     if (!success) {
       std::cerr << "[MOTOR] Warning: Failed to set velocity for DDSM315 motor with ID "
                 << motor_id << std::endl;
@@ -183,8 +183,8 @@ int main() {
   pub_state = node.add_pub("joint_state");
   node.add_sub("joint_command", &msg_command);
 
-  node.add_timer([&node]() { actuate_and_publish_state(node); }, 80);
-  node.add_timer([&node]() { update_servo_state(node); }, 20);
+  node.add_timer([&node]() { actuate_and_publish_state(node); }, 100);
+  //node.add_timer([&node]() { update_servo_state(node); }, 20);
 
   node.spin();
 
