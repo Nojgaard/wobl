@@ -117,14 +117,21 @@
         <position name="L_hip" joint="L_hip" kp="32" kv="5" ctrlrange="-0.20 0.65" />
         <position name="R_hip" joint="R_hip" kp="32" kv="5" ctrlrange="-0.20 0.65" />
 
-        <velocity name="L_foot" joint="L_foot"
+        <motor name="L_foot" joint="L_foot"
+            ctrllimited="true" ctrlrange="-1.96 1.96"
+            gear="1" />
+        <motor name="R_foot" joint="R_foot"
+            ctrllimited="true" ctrlrange="-1.96 1.96"
+            gear="1" />
+        <!--<velocity
+        name="L_foot" joint="L_foot"
             ctrllimited="true" ctrlrange="-10 10"
             forcelimited="true" forcerange="-1.96 1.96"
             kv="1"/>
         <velocity name="R_foot" joint="R_foot"
             ctrllimited="true" ctrlrange="-10 10"
             forcelimited="true" forcerange="-1.96 1.96"
-            kv="1"/>
+            kv="1"/>-->
     </actuator>
     <sensor>
         <framequat name="ImuSensor_Framequat" objtype="site" objname="ImuSensor" />

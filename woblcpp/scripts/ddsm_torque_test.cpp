@@ -11,7 +11,7 @@
 
 using namespace wobl::real;
 
-constexpr double KI = 0.37; // Motor torque constant (Nm/A)
+constexpr double KI = 0.42; // Motor torque constant (Nm/A)
 constexpr double WHEEL_MASS = 0.35; // kg
 constexpr double WHEEL_RADIUS = 0.039; // m
 
@@ -86,7 +86,7 @@ void calibrate_kt(const std::vector<float>& currents,
     double estimated_kt = sum_kt / valid_samples;
     std::cout << "\n=== Kt Calibration ===\n";
     std::cout << "Wheel inertia: " << WHEEL_INERTIA << " kg·m²\n";
-    std::cout << "Estimated Kt: " << std::fixed << std::setprecision(4) 
+    std::cout << "Estimated Kt: " << std::fixed << std::setprecision(6) 
               << estimated_kt << " Nm/A\n";
     std::cout << "Assumed Kt: " << KI << " Nm/A\n";
     std::cout << "Deviation: " << std::fixed << std::setprecision(1)
