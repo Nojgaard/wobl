@@ -41,13 +41,13 @@ def compute_lqr_gains():
     Q = np.diag(
         [
             50.0,  # θ - pitch angle (critical!)
-            5.0,  # θ̇ - angular velocity
+            25.0,  # θ̇ - angular velocity
             1.0,  # x_pos - position (for integral action)
             10.0,  # ẋ - linear velocity
         ]
     )
 
-    R = np.array([[3]])  # Torque effort (in Nm²)
+    R = np.array([[0.7]])  # Torque effort (in Nm²)
 
     K, _, _ = control.lqr(A, B, Q, R)
     return K[0]
