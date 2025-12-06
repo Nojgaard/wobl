@@ -39,7 +39,7 @@ class Controller:
 
         self.last_left_torque = 0.0
         self.last_right_torque = 0.0
-        self.max_torque_rate = 25.0  # Nm/s - tune this based on testing
+        self.max_torque_rate = 40.0  # Nm/s - tune this based on testing
 
         self.diff_drive = DiffDriveKinematics(0.3, 0.04, 10.0)
 
@@ -132,7 +132,7 @@ class Controller:
         right_torque = ctrl_torque - ctrl_yaw_torque
 
         # Apply torque rate limiting
-        """max_delta = self.max_torque_rate * dt
+        max_delta = self.max_torque_rate * dt
 
         left_torque = np.clip(
             left_torque,
@@ -143,14 +143,6 @@ class Controller:
             right_torque,
             self.last_right_torque - max_delta,
             self.last_right_torque + max_delta,
-        )"""
-
-        k = 1.2
-        left_torque = self.update_velocity(
-            left_torque, ctrl_torque + ctrl_yaw_torque, dt, a_max=25.0, k=k
-        )
-        right_torque = self.update_velocity(
-            right_torque, ctrl_torque - ctrl_yaw_torque, dt, a_max=25.0, k=k
         )
 
         # Store for next iteration

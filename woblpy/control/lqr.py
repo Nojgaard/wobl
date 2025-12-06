@@ -40,14 +40,14 @@ def compute_lqr_gains():
     # LQR cost matrices
     Q = np.diag(
         [
-            30.0,  # θ - pitch angle (critical!)
-            2.0,  # θ̇ - angular velocity
+            50.0,  # θ - pitch angle (critical!)
+            10.0,  # θ̇ - angular velocity
             1.0,  # x_pos - position (for integral action)
             10.0,  # ẋ - linear velocity
         ]
     )
 
-    R = np.array([[1.4]])  # Torque effort (in Nm²)
+    R = np.array([[0.5]])  # Torque effort (in Nm²)
 
     K, _, _ = control.lqr(A, B, Q, R)
     return K[0]
