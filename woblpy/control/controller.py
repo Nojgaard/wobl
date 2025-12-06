@@ -39,7 +39,7 @@ class Controller:
 
         self.last_left_torque = 0.0
         self.last_right_torque = 0.0
-        self.max_torque_rate = 50.0  # Nm/s - tune this based on testing
+        self.max_torque_rate = 25.0  # Nm/s - tune this based on testing
 
         self.diff_drive = DiffDriveKinematics(0.3, 0.04, 10.0)
 
@@ -104,6 +104,7 @@ class Controller:
 
         # self.pitch_rate.update((self.pitch - last_pitch) / dt)
         # pitch_rate = self.pitch_rate.value
+        # pitch_rate = 0
 
         ctrl_torque = -(
             k_pitch * pitch
@@ -113,12 +114,25 @@ class Controller:
         )
         ctrl_yaw_torque = cmd_yaw_rate * 0.5
 
+        # Add deadband near equilibrium to reduce chatter
+        # if abs(pitch) < 0.02:
+        #    ctrl_torque *= 0.2  # Reduce gain significantly near equilibrium
+
+        """ctrl_fwd_velocity = self.update_velocity(
+            self.last_left_torque, ctrl_torque, dt, a_max=50.0, k=2.0
+        )
+        self.last_left_torque = ctrl_fwd_velocity
+
+        ctrl_left_rps, ctrl_right_rps = self.diff_drive.inverse_kinematics(
+            ctrl_fwd_velocity, ctrl_yaw_torque
+        )"""
+
         # Desired torques
         left_torque = ctrl_torque + ctrl_yaw_torque
         right_torque = ctrl_torque - ctrl_yaw_torque
 
         # Apply torque rate limiting
-        max_delta = self.max_torque_rate * dt
+        """max_delta = self.max_torque_rate * dt
 
         left_torque = np.clip(
             left_torque,
@@ -129,7 +143,19 @@ class Controller:
             right_torque,
             self.last_right_torque - max_delta,
             self.last_right_torque + max_delta,
+        )"""
+
+        k = 1.2
+        left_torque = self.update_velocity(
+            left_torque, ctrl_torque + ctrl_yaw_torque, dt, a_max=25.0, k=k
         )
+        right_torque = self.update_velocity(
+            right_torque, ctrl_torque - ctrl_yaw_torque, dt, a_max=25.0, k=k
+        )
+
+        # Store for next iteration
+        self.last_left_torque = left_torque
+        self.last_right_torque = right_torque
 
         # Clamp to motor limits
         left_torque = np.clip(left_torque, -1.96, 1.96)

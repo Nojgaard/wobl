@@ -68,10 +68,10 @@ bool begin_ddsm_driver() {
                 << std::endl;
       return false;
     }
+    ddsm_driver.set_mode(id, wobl::real::DDSM315Driver::CURRENT_LOOP);
     std::cout << "[MOTOR] DDSM315 motor with ID " << id << " is online"
               << std::endl;
   }
-
   std::cout << "[MOTOR] DDSM315 Driver initialized successfully" << std::endl;
   return true;
 }
@@ -132,7 +132,7 @@ void actuate_ddsm(wobl::Node &node) {
 
     bool success = ddsm_driver.set_current(motor_id, mirror_scalar * (vel * WHEEL_KT), ddsm_feedback);
     // bool success = ddsm_driver.set_rps(motor_id, mirror_scalar * vel, ddsm_feedback);
-
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
     if (!success) {
       std::cerr << "[MOTOR] Warning: Failed to set velocity for DDSM315 motor with ID "
                 << motor_id << std::endl;
