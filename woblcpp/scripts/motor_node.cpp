@@ -25,6 +25,8 @@ wobl::real::ServoDriver st_driver("/dev/ttyAMA1");
 
 wobl::real::DDSM315Driver::Feedback ddsm_feedback;
 
+const float WHEEL_KT = 0.37f; // Nm/A
+
 void enable_motors(bool enable) {
   for (int id : {SERVO_LEFT, SERVO_RIGHT}) {
     if (!st_driver.enable_torque(id, enable))
@@ -128,7 +130,8 @@ void actuate_ddsm(wobl::Node &node) {
     float mirror_scalar = (motor_id == WHEEL_LEFT) ? 1.0f : -1.0f;
     float vel = msg_command.velocity(i);
 
-    bool success = ddsm_driver.set_rps(motor_id, mirror_scalar * vel, ddsm_feedback);
+    bool success = ddsm_driver.set_current(motor_id, mirror_scalar * (vel * WHEEL_KT), ddsm_feedback);
+    // bool success = ddsm_driver.set_rps(motor_id, mirror_scalar * vel, ddsm_feedback);
 
     if (!success) {
       std::cerr << "[MOTOR] Warning: Failed to set velocity for DDSM315 motor with ID "
