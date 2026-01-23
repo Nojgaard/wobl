@@ -8,6 +8,7 @@
 #include <wobl/real/ddsm315_driver.hpp>
 #include <thread>
 #include <chrono>
+#include <mutex>
 
 namespace wobl::real {
 
@@ -60,7 +61,7 @@ void DDSM315Driver::open_port(std::string port) {
   tty.c_oflag &= ~OPOST; // Prevent special interpretation of output bytes
   // Prevent conversion of newline to carriage return/line feed
   tty.c_oflag &= ~ONLCR;
-  tty.c_cc[VTIME] = 1; // Read timeout
+  tty.c_cc[VTIME] = 0; // Read timeout
   tty.c_cc[VMIN] = 0;
 
   // Set baud to 115200
@@ -103,15 +104,46 @@ bool DDSM315Driver::set_mode(int id, Mode mode) {
   return bytes_written == PACKET_SIZE;
 }
 
+ssize_t read_data(int fd, uint8_t* buffer, size_t size) {
+  size_t total_read = 0;
+  auto start_time = std::chrono::steady_clock::now();
+  const auto timeout = std::chrono::milliseconds(4);
+  
+  // Read until we get all expected bytes or timeout
+  while (total_read < size) {
+    ssize_t bytes_read = read(fd, buffer + total_read, size - total_read);
+    
+    if (bytes_read > 0) {
+      total_read += bytes_read;
+    } else if (bytes_read < 0) {
+      std::cerr << "Read error: " << errno << std::endl;
+      return total_read;
+    }
+    
+    // Check timeout
+    auto elapsed = std::chrono::steady_clock::now() - start_time;
+    if (total_read != size && elapsed > timeout) {
+      std::cerr << "Read timeout: expected " << (int)size
+                << " bytes, got " << total_read << " bytes." << std::endl;
+      return total_read;
+    }
+  }
+  return total_read;
+}
+
 bool DDSM315Driver::read_response(Feedback &feedback) {
-  tcflush(port_fd_, TCIFLUSH);
-  ssize_t bytes_read = read(port_fd_, packet, PACKET_SIZE);
+  int expected_id = packet[0];
+  ssize_t bytes_read = read_data(port_fd_, packet, PACKET_SIZE);
   if (bytes_read != PACKET_SIZE) {
+    std::cerr << "Read error: expected " << (int)PACKET_SIZE
+              << " bytes, got " << bytes_read << " bytes." << std::endl;
     return false;
   }
 
   uint8_t crc = maxim_crc8(packet, PACKET_SIZE - 1);
   if (crc != packet[PACKET_SIZE - 1]) {
+    std::cerr << "CRC error: expected " << (int)packet[PACKET_SIZE - 1]
+              << ", got " << (int)crc << std::endl;
     return false;
   }
 
@@ -150,6 +182,10 @@ bool DDSM315Driver::read_response(Feedback &feedback) {
   feedback.position_rad =
       (360.0 / 32767.0) * (M_PI / 180.0) * (float)position_lsb;
 
+  if (packet[0] != expected_id) {
+    std::cerr << "Unexpected motor ID\n";
+    return false;
+  }
   return true;
 }
 
@@ -188,6 +224,10 @@ bool DDSM315Driver::set_current(int id, float current_amp, Feedback &feedback) {
   if (!is_port_open()) {
     return false;
   }
+
+    // Lock the port for this entire transaction
+  std::lock_guard<std::mutex> lock(port_mutex_);
+
   uint8_t acceleration = 0;
 
   current_amp = std::clamp(current_amp, -0.8f, 0.8f);
@@ -205,8 +245,11 @@ bool DDSM315Driver::set_current(int id, float current_amp, Feedback &feedback) {
   packet[9] = maxim_crc8(packet, PACKET_SIZE - 1);
 
   ssize_t bytes_written = write(port_fd_, packet, PACKET_SIZE);
-  if (bytes_written != PACKET_SIZE)
+  if (bytes_written != PACKET_SIZE){
+    std::cerr << "Write error: expected " << (int)PACKET_SIZE
+              << " bytes, wrote " << bytes_written << " bytes." << std::endl;
     return false;
+  }
 
   return read_response(feedback);
 }
