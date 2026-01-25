@@ -25,9 +25,9 @@ wobl::real::ServoDriver st_driver("/dev/ttyAMA1");
 
 wobl::real::DDSM315Driver::Feedback ddsm_feedback;
 
-//const float WHEEL_KT = 0.37f; // Nm/A
-//const float WHEEL_KT = 0.15f; // Nm/A
-const float WHEEL_KT = 0.5f;
+//const float WHEEL_KT = 1 / 0.37f; // Nm/A
+//const float WHEEL_KT = 1 / 0.15f; // Nm/A
+const float WHEEL_KT = 1;
 
 void enable_motors(bool enable) {
   for (int id : {SERVO_LEFT, SERVO_RIGHT}) {
@@ -113,6 +113,7 @@ bool has_pending_command(int idx) {
 }
 
 void actuate_servos(wobl::Node &node) {
+  //auto start_time = std::chrono::steady_clock::now();
   for (int i = 0; i < 2; ++i) {
     if (!has_pending_command(i))
       continue;
@@ -125,9 +126,13 @@ void actuate_servos(wobl::Node &node) {
 
     st_driver.write_position(motor_id, mirror_scalar * pos, vel, 0.2);
   }
+  
+  //std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_time;
+  //std::cout << "[MOTOR] STServo actuation took " << elapsed.count() * 1000.0 << " ms" << std::endl;
 }
 
 void actuate_ddsm(wobl::Node &node) {
+  auto start_time = std::chrono::steady_clock::now();
   for (int i = 2; i < 4; ++i) {
     int motor_id = index_to_id[i];
     float mirror_scalar = (motor_id == WHEEL_LEFT) ? 1.0f : -1.0f;
@@ -148,6 +153,9 @@ void actuate_ddsm(wobl::Node &node) {
     msg_state.set_velocity(i, mirror_scalar * ddsm_feedback.velocity_rps);
     msg_state.set_effort(i, ddsm_feedback.current_amp);
   }
+
+  //std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - start_time;
+  //std::cout << "[MOTOR] DDSM315 actuation took " << elapsed.count() * 1000.0 << " ms" << std::endl;
 }
 
 void actuate_and_publish_state(wobl::Node &node) {
@@ -190,7 +198,7 @@ int main() {
   pub_state = node.add_pub("joint_state");
   node.add_sub("joint_command", &msg_command);
 
-  node.add_timer([&node]() { actuate_and_publish_state(node); }, 50);
+  node.add_timer([&node]() { actuate_and_publish_state(node); }, 100);
   //node.add_timer([&node]() { update_servo_state(node); }, 20);
 
   node.spin();

@@ -199,7 +199,7 @@ bool DDSM315Driver::set_rps(int id, float rps, Feedback &feedback) {
   if (!is_port_open()) {
     return false;
   }
-
+  tcflush(port_fd_, TCIOFLUSH);
   float rps2rpm = 60.0f / (2.0f * M_PI);
   int16_t rpm = static_cast<int16_t>(std::round(rps * rps2rpm));
   rpm = std::clamp(rpm, (int16_t)-330, (int16_t)330);
