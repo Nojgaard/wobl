@@ -8,7 +8,6 @@
 #include <wobl/real/ddsm315_driver.hpp>
 #include <thread>
 #include <chrono>
-#include <mutex>
 
 namespace wobl::real {
 
@@ -107,7 +106,8 @@ bool DDSM315Driver::set_mode(int id, Mode mode) {
 ssize_t read_data(int fd, uint8_t* buffer, size_t size) {
   size_t total_read = 0;
   auto start_time = std::chrono::steady_clock::now();
-  const auto timeout = std::chrono::milliseconds(4);
+  const auto timeout = std::chrono::milliseconds(10);
+  const auto first_byte_timeout = std::chrono::milliseconds(4);
   
   // Read until we get all expected bytes or timeout
   while (total_read < size) {
@@ -123,8 +123,14 @@ ssize_t read_data(int fd, uint8_t* buffer, size_t size) {
     // Check timeout
     auto elapsed = std::chrono::steady_clock::now() - start_time;
     if (total_read != size && elapsed > timeout) {
-      std::cerr << "Read timeout: expected " << (int)size
-                << " bytes, got " << total_read << " bytes." << std::endl;
+      //std::cerr << "Read timeout: expected " << (int)size
+      //          << " bytes, got " << total_read << " bytes." << std::endl;
+      return total_read;
+    }
+
+    if (total_read == 0 && elapsed > first_byte_timeout) {
+      // If no bytes have been read yet, use a shorter timeout for the first byte
+      //std::cerr << "First byte read timeout." << std::endl;
       return total_read;
     }
   }
@@ -135,8 +141,8 @@ bool DDSM315Driver::read_response(Feedback &feedback) {
   int expected_id = packet[0];
   ssize_t bytes_read = read_data(port_fd_, packet, PACKET_SIZE);
   if (bytes_read != PACKET_SIZE) {
-    std::cerr << "Read error: expected " << (int)PACKET_SIZE
-              << " bytes, got " << bytes_read << " bytes." << std::endl;
+    //std::cerr << "Read error: expected " << (int)PACKET_SIZE
+    //          << " bytes, got " << bytes_read << " bytes." << std::endl;
     return false;
   }
 
@@ -224,10 +230,7 @@ bool DDSM315Driver::set_current(int id, float current_amp, Feedback &feedback) {
   if (!is_port_open()) {
     return false;
   }
-
-    // Lock the port for this entire transaction
-  std::lock_guard<std::mutex> lock(port_mutex_);
-
+  tcflush(port_fd_, TCIOFLUSH);
   uint8_t acceleration = 0;
 
   current_amp = std::clamp(current_amp, -0.8f, 0.8f);

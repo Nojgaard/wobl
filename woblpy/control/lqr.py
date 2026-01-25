@@ -9,8 +9,10 @@ def compute_lqr_gains():
         K: Gain vector [k_pitch, k_pitch_rate, k_position, k_velocity]
     """
     # Physical parameters
-    m_body, m_wheel = 2.3909, 0.25  # Body and wheel mass (kg)
-    com_height, r = 0.09779, 0.039  # CoM height and wheel radius (m)
+    # m_body, m_wheel = 2.3909, 0.25  # Body and wheel mass (kg)
+    m_body, m_wheel = 2.0, 0.20  # Body and wheel mass (kg)
+    # com_height, r = 0.09779, 0.039  # CoM height and wheel radius (m)
+    com_height, r = 0.11, 0.039  # CoM height and wheel radius (m)
     g = 9.80665  # Gravity (m/s²)
 
     # Moments of inertia

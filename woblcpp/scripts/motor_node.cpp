@@ -25,7 +25,9 @@ wobl::real::ServoDriver st_driver("/dev/ttyAMA1");
 
 wobl::real::DDSM315Driver::Feedback ddsm_feedback;
 
-const float WHEEL_KT = 0.37f; // Nm/A
+//const float WHEEL_KT = 0.37f; // Nm/A
+//const float WHEEL_KT = 0.15f; // Nm/A
+const float WHEEL_KT = 0.5f;
 
 void enable_motors(bool enable) {
   for (int id : {SERVO_LEFT, SERVO_RIGHT}) {
@@ -133,6 +135,9 @@ void actuate_ddsm(wobl::Node &node) {
 
     bool success = ddsm_driver.set_current(motor_id, mirror_scalar * (vel * WHEEL_KT), ddsm_feedback);
     // bool success = ddsm_driver.set_rps(motor_id, mirror_scalar * vel, ddsm_feedback);
+    // Try once more if failed
+    if (!success)
+      success = ddsm_driver.set_current(motor_id, mirror_scalar * (vel * WHEEL_KT), ddsm_feedback);
     if (!success) {
       std::cerr << "[MOTOR] Warning: Failed to set velocity for DDSM315 motor with ID "
                 << motor_id << std::endl;
@@ -175,7 +180,9 @@ void update_servo_state(wobl::Node &node) {
 int main() {
   wobl::Node node;
   init_msg();
-  if (!begin_ddsm_driver() || !begin_st_driver()) {
+  if (!begin_ddsm_driver() 
+   || !begin_st_driver()
+  ) {
     return -1;
   }
   enable_motors(true);
@@ -183,7 +190,7 @@ int main() {
   pub_state = node.add_pub("joint_state");
   node.add_sub("joint_command", &msg_command);
 
-  node.add_timer([&node]() { actuate_and_publish_state(node); }, 100);
+  node.add_timer([&node]() { actuate_and_publish_state(node); }, 50);
   //node.add_timer([&node]() { update_servo_state(node); }, 20);
 
   node.spin();
