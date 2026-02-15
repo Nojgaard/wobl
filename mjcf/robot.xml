@@ -5,7 +5,7 @@
         <geom type="mesh" />
         <joint damping="0.02" armature="0.05" frictionloss="0.01" axis="1 0 0" />
         <default class="foot_collider">
-            <geom type="cylinder" quat="0.7071 0 0.7071 0" size="0.04 0.018" rgba="1 0 0 0"
+            <geom type="cylinder" quat="0.7071 0 0.7071 0" size="0.075 0.018" rgba="1 0 0 1"
                 contype="1" conaffinity="1" />
         </default>
         <default class="mirror">
@@ -117,14 +117,13 @@
         <position name="L_hip" joint="L_hip" kp="32" kv="5" ctrlrange="-0.20 0.65" />
         <position name="R_hip" joint="R_hip" kp="32" kv="5" ctrlrange="-0.20 0.65" />
 
-        <motor name="L_foot" joint="L_foot"
+        <!--<motor name="L_foot" joint="L_foot"
             ctrllimited="true" ctrlrange="-1.96 1.96"
             gear="1" />
         <motor name="R_foot" joint="R_foot"
             ctrllimited="true" ctrlrange="-1.96 1.96"
             gear="1" />
-        <!--<velocity
-        name="L_foot" joint="L_foot"
+        <velocity name="L_foot" joint="L_foot"
             ctrllimited="true" ctrlrange="-10 10"
             forcelimited="true" forcerange="-1.96 1.96"
             kv="1"/>
@@ -132,6 +131,15 @@
             ctrllimited="true" ctrlrange="-10 10"
             forcelimited="true" forcerange="-1.96 1.96"
             kv="1"/>-->
+
+        <velocity name="L_foot" joint="L_foot"
+            ctrllimited="true" ctrlrange="-10 10"
+            forcelimited="true" forcerange="-0.98 0.98"
+            kv="1"/>
+        <velocity name="R_foot" joint="R_foot"
+            ctrllimited="true" ctrlrange="-10 10"
+            forcelimited="true" forcerange="-0.98 0.98"
+            kv="1"/>
     </actuator>
     <sensor>
         <framequat name="ImuSensor_Framequat" objtype="site" objname="ImuSensor" />
