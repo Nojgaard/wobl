@@ -50,7 +50,14 @@ def main():
         joint_command.timestamp = time.time()
         node.send(pub, joint_command)
         print(f"Sent wheel velocities: {vel} rad/s for {dur} seconds")
-        time.sleep(dur)
+
+        # Print current state velocities periodically
+        start_time = time.time()
+        while time.time() - start_time < dur:
+            print(
+                f"  Current wheel velocities: left={state.velocity[2]:.3f}, right={state.velocity[3]:.3f} rad/s"
+            )
+            time.sleep(0.5)
 
     node.close()
 

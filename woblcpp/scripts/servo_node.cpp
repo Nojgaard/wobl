@@ -7,12 +7,16 @@
 enum JointToId {
   HIP_LEFT = 0,
   HIP_RIGHT = 5,
-  WHEEL_LEFT = 2,
-  WHEEL_RIGHT = 6,
+  WHEEL_LEFT = 6,
+  WHEEL_RIGHT = 2,
 };
 
-const std::vector<uint8_t> servo_ids = {HIP_LEFT, HIP_RIGHT, WHEEL_LEFT,
-                                        WHEEL_RIGHT};
+// 1:2 gear ratio for the wheel to increase speed at the cost of torque.
+const float WHEEL_GEAR_RATIO = 0.5;
+
+const std::vector<uint8_t> servo_ids = {HIP_LEFT, HIP_RIGHT, WHEEL_LEFT, WHEEL_RIGHT};
+const std::vector<float> world2servo_coords = {-1.0f, 1.0f, -WHEEL_GEAR_RATIO, WHEEL_GEAR_RATIO};
+const std::vector<float> servo2world_coords = {-1.0f, 1.0f, -1.0f / WHEEL_GEAR_RATIO, 1.0f / WHEEL_GEAR_RATIO};
 bool is_enabled = false;
 
 void enable_servos(wobl::real::ServoDriver &driver, bool enable, bool force = false) {
@@ -108,9 +112,11 @@ int main(int, char **) {
   node.add_sub("joint_command", &msg_command);
   node.add_sub("joint_enable", &msg_enable);
 
+  enable_servos(driver, true, true);
+
   node.add_timer(
       [&]() {
-        enable_servos(driver, msg_enable.enable());
+        //enable_servos(driver, msg_enable.enable());
         if (!is_enabled)
           return;
         
@@ -119,13 +125,12 @@ int main(int, char **) {
             continue;
 
           u8 id = servo_ids[i];
-          float mirror_scalar =
-              (id == HIP_RIGHT || id == WHEEL_RIGHT) ? 1.0f : -1.0f;
+          float world2servo = world2servo_coords[i];
           if (id == HIP_LEFT || id == HIP_RIGHT) {
-            driver.write_position(id, mirror_scalar * msg_command.position(i),
+            driver.write_position(id, world2servo * msg_command.position(i),
                                   msg_command.velocity(i), 0.2);
           } else if (id == WHEEL_LEFT || id == WHEEL_RIGHT) {
-            driver.write_velocity(id, mirror_scalar * msg_command.velocity(i),
+            driver.write_velocity(id, world2servo * msg_command.velocity(i),
                                   0.35);
           }
         }
@@ -138,11 +143,10 @@ int main(int, char **) {
 
           for (size_t i = 0; i < servo_ids.size(); ++i) {
             u8 id = servo_ids[i];
-            float mirror_scalar =
-                (id == HIP_RIGHT || id == WHEEL_RIGHT) ? 1.0f : -1.0f;
+            float servo2world = servo2world_coords[i];
             auto servo_state = driver.read_state(servo_ids[i]);
-            msg_state.set_position(i, mirror_scalar * servo_state.position_rad);
-            msg_state.set_velocity(i, mirror_scalar * servo_state.velocity_rps);
+            msg_state.set_position(i, servo2world * servo_state.position_rad);
+            msg_state.set_velocity(i, servo2world * servo_state.velocity_rps);
             msg_state.set_effort(i, servo_state.current_amps);
           }
           node.send(state_pub, msg_state);

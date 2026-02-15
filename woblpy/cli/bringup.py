@@ -108,8 +108,8 @@ def main():
     commands = {
         "real": [
             [sys.executable, controller_paths[args.controller]],
+            ["build/woblcpp-linux/scripts/servo_node"],
             ["build/woblcpp-linux/scripts/imu_node"],
-            ["build/woblcpp-linux/scripts/motor_node"],
         ],
         "sim": [
             [sys.executable, controller_paths[args.controller]],

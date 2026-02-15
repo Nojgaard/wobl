@@ -20,8 +20,8 @@ wobl::msg::JointState msg_state;
 
 int pub_state = -1;
 
-wobl::real::DDSM315Driver ddsm_driver("/dev/ttyACM0");
-wobl::real::ServoDriver st_driver("/dev/ttyAMA1");
+wobl::real::DDSM315Driver ddsm_driver;
+wobl::real::ServoDriver st_driver;
 
 wobl::real::DDSM315Driver::Feedback ddsm_feedback;
 

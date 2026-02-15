@@ -26,7 +26,7 @@ namespace wobl::real
             VELOCITY = 1
         };
 
-        ServoDriver(std::string port = "/dev/ttyAMA1") { port_ = port; }
+        ServoDriver(std::string port = "/dev/ttyACM0") { port_ = port; }
         bool initialize();
         ~ServoDriver();
         bool ping(u8 servo_id);
