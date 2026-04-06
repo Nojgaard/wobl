@@ -21,5 +21,3 @@ build/
 *_pb2.pyi
 
 data/current_recording.rrd
-
-uv.lock
