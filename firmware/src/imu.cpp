@@ -1,4 +1,5 @@
 #include <imu.hpp>
+#include "debug.hpp"
 
 // Override of the weak ICM_20948::initializeDMP from the SparkFun library.
 //
@@ -309,9 +310,9 @@ bool IMU::initialize(SPIClass &spi, uint8_t csPin) {
 
   auto check = [&](ICM_20948_Status_e ret, const char *name) {
     if (ret != ICM_20948_Stat_Ok) {
-      Serial.print(name);
-      Serial.print(" failed: ");
-      Serial.println(icm_.statusString(ret));
+      DPRINT(name);
+      DPRINT(" failed: ");
+      DPRINTLN(icm_.statusString(ret));
       success = false;
     }
   };
@@ -403,8 +404,8 @@ void IMU::print_biases() {
   icm_.getBiasCPassY(&mag_y);
   icm_.getBiasCPassZ(&mag_z);
 
-  printf("Loaded Biases:\n");
-  printf("  Linear Acceleration: [%d, %d, %d]\n", acc_x, acc_y, acc_z);
-  printf("  Angular Velocity:    [%d, %d, %d]\n", gyr_x, gyr_y, gyr_z);
-  printf("  Compass:             [%d, %d, %d]\n", mag_x, mag_y, mag_z);
+  DPRINTLN("Loaded Biases:");
+  DPRINTF("  Linear Acceleration: [%d, %d, %d]\n", acc_x, acc_y, acc_z);
+  DPRINTF("  Angular Velocity:    [%d, %d, %d]\n", gyr_x, gyr_y, gyr_z);
+  DPRINTF("  Compass:             [%d, %d, %d]\n", mag_x, mag_y, mag_z);
 }
