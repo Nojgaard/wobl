@@ -1,17 +1,16 @@
 #include "imu_task.hpp"
 #include "wheel_task.hpp"
+#include "servo_task.hpp"
 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_bt.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <SCServo.h>
 
 long lastUpdateTime = 0;
 
 static SharedState state;
-SMS_STS st;
 
 void setup() {
   WiFi.mode(WIFI_OFF);
@@ -20,10 +19,11 @@ void setup() {
 
   wheelTaskInit(state);
   imuTaskInit(state);
+  servoTaskInit(state);
 
-  xTaskCreatePinnedToCore(wheelTask, "foc", 4096, &state, 24, NULL, 1);
-  xTaskCreatePinnedToCore(imuTask, "imu", 4096, &state, 10, NULL, 0);
-  st.CalibrationOfs(1);
+  xTaskCreatePinnedToCore(wheelTask, "foc",   4096, &state, 24, NULL, 1);
+  xTaskCreatePinnedToCore(imuTask,   "imu",   4096, &state, 10, NULL, 0);
+  xTaskCreatePinnedToCore(servoTask, "servo", 4096, &state, 10, NULL, 0);
 }
 
 void loop() { vTaskDelete(NULL); }

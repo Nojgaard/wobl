@@ -1,6 +1,7 @@
 #pragma once
 #include "imu.hpp"
 #include "wheel.hpp"
+#include "servo.hpp"
 
 template <typename T> class Protected {
   T _val;
@@ -41,23 +42,41 @@ struct WheelsData {
   Wheel::Data right;
 };
 
-struct WheelsCommand {
-  Wheel::Command left;
-  Wheel::Command right;
+struct ServosData {
+  Servo::Data left;
+  Servo::Data right;
 };
 
 struct SensorState {
   Protected<IMU::Data> imu;
   Protected<WheelsData> wheels;
+  Protected<ServosData> servos;
+};
+
+struct WheelsCommand {
+  Wheel::Command left;
+  Wheel::Command right;
+};
+
+struct ServosCommand {
+  Servo::Command left;
+  Servo::Command right;
 };
 
 struct ActuatorCommands {
   Protected<WheelsCommand> wheels;
+  Protected<ServosCommand> servos;
+};
+
+struct ServosStatus {
+  bool leftOk;
+  bool rightOk;
 };
 
 struct DeviceStatus {
   Protected<IMUStatus> imu;
   Protected<WheelsStatus> wheels;
+  Protected<ServosStatus> servos;
 };
 
 struct SharedState {
