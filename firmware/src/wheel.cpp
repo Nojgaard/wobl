@@ -25,7 +25,7 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   // velocity low pass filtering
   // default 5ms - try different values to see what is the best.
   // the lower the less filtered
-  _motor.LPF_velocity.Tf = 0.01f;
+  _motor.LPF_velocity.Tf = 0.005f;
 
   // velocity PI controller parameters
   _motor.PID_velocity.P = 0.2f;
