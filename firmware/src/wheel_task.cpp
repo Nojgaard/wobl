@@ -4,7 +4,7 @@
 #include "debug.hpp"
 
 Wheel::Config leftWheelConfig{
-    .polePairs = 7, .pinA = 12, .pinB = 14, .pinC = 27, .pinEnable = 13};
+    .polePairs = 11, .pinA = 12, .pinB = 14, .pinC = 27, .pinEnable = 13};
 
 Wheel::Config rightWheelConfig{
     .polePairs = 7, .pinA = 4, .pinB = 33, .pinC = 32, .pinEnable = 2};
@@ -23,7 +23,7 @@ static TwoWire wire1(1);
 
 static constexpr long kClockSpeed = 400000; // 400 kHz
 static constexpr float kVoltageSupply = 12.0;
-static constexpr float kVoltageLimit = 3.0;
+static constexpr float kVoltageLimit = 5.0;
 
 static long lastUpdateTime = 0;
 
@@ -36,10 +36,11 @@ void wheelTaskInit(SharedState &state) {
   #endif
 
   status.leftStatus = leftWheel.init(kVoltageSupply, kVoltageLimit, wire0);
+  vTaskDelay(100 / portTICK_PERIOD_MS);
   status.rightStatus = rightWheel.init(kVoltageSupply, kVoltageLimit, wire1);
 
-  DPRINTF("Left wheel status: %d", status.leftStatus);
-  DPRINTF("Right wheel status: %d", status.rightStatus);
+  DPRINTF("[wheels] left  init=%d ok=%d\r\n", status.leftStatus,  leftWheel.isOk());
+  DPRINTF("[wheels] right init=%d ok=%d\r\n", status.rightStatus, rightWheel.isOk());
 
   lastUpdateTime = millis();
   state.status.wheels.write(status);
@@ -70,8 +71,15 @@ static void update(SharedState &state) {
 
 void wheelTask(void *parameters) {
   auto state = static_cast<SharedState *>(parameters);
+  long lastFocTime = micros();
 
   for (;;) {
     update(*state);
+
+    long now = micros();
+    status.focRate = 1000000.0f / (now - lastFocTime);
+    lastFocTime = now;
+
+    vTaskDelay(1 / portTICK_PERIOD_MS);
   }
 }

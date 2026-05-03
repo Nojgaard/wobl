@@ -32,6 +32,7 @@ struct IMUStatus {
 };
 
 struct WheelsStatus {
+  float focRate;
   float updateRate;
   int leftStatus;
   int rightStatus;

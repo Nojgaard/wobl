@@ -35,8 +35,10 @@ public:
 
     const Data &data();
     void command(bool enabled, float velocity);
+    bool isOk() const;
 
 private:
+    bool _initOk = false;
     Data _data;
     Command _command;
     Calibration _calibration;

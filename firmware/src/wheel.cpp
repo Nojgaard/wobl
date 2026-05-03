@@ -6,6 +6,12 @@ Wheel::Wheel(Config config)
       _motor(config.polePairs) {}
 
 int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
+  // Probe the AS5600 before handing off to SimpleFOC.
+  wire.beginTransmission(0x36);
+  if (wire.endTransmission() != 0) {
+    return 0; // sensor not found on this bus
+  }
+
   int status = 1;
   _sensor.init(&wire);
   _motor.linkSensor(&_sensor);
@@ -25,12 +31,12 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   // velocity low pass filtering
   // default 5ms - try different values to see what is the best.
   // the lower the less filtered
-  _motor.LPF_velocity.Tf = 0.005f;
+  _motor.LPF_velocity.Tf = 0.01f;
 
   // velocity PI controller parameters
-  _motor.PID_velocity.P = 0.2f;
-  _motor.PID_velocity.I = 20;
-  _motor.PID_velocity.D = 0;
+  _motor.PID_velocity.P = 0.1f;
+  _motor.PID_velocity.I = 0.5f;
+  _motor.PID_velocity.D = 0.0f;
 
   status = _motor.init();
   if (status != 1) {
@@ -42,12 +48,22 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
     _motor.sensor_direction = _calibration.sensor_direction;
   }
 
-  return _motor.initFOC();
+  int foc = _motor.initFOC();
+  if (foc == 1 && _motor.sensor_direction == Direction::UNKNOWN) {
+    // Sensor responded but direction could not be determined — likely swapped sensor/motor
+    return 0;
+  }
+  _initOk = (foc == 1);
+  return foc;
 }
 
 const Wheel::Data &Wheel::data() { return _data; }
 
+bool Wheel::isOk() const { return _initOk; }
+
 void Wheel::command(bool enabled, float velocity) {
+  if (!_initOk) return;
+
   _command.enabled = enabled;
   _command.velocity = velocity;
 
@@ -61,6 +77,8 @@ void Wheel::command(bool enabled, float velocity) {
 }
 
 void Wheel::update() {
+  if (!_initOk) return;
+
   _motor.loopFOC();
   _motor.move(_command.velocity);
 
