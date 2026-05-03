@@ -18,12 +18,12 @@ void setup() {
   Serial.begin(115200);
 
   wheelTaskInit(state);
-  imuTaskInit(state);
-  servoTaskInit(state);
+  //imuTaskInit(state);
+  //servoTaskInit(state);
 
   xTaskCreatePinnedToCore(wheelTask, "foc",   4096, &state, 24, NULL, 1);
-  xTaskCreatePinnedToCore(imuTask,   "imu",   4096, &state, 10, NULL, 0);
-  xTaskCreatePinnedToCore(servoTask, "servo", 4096, &state, 10, NULL, 0);
+  //xTaskCreatePinnedToCore(imuTask,   "imu",   4096, &state, 10, NULL, 0);
+  //xTaskCreatePinnedToCore(servoTask, "servo", 4096, &state, 10, NULL, 0);
 }
 
 void loop() { vTaskDelete(NULL); }
