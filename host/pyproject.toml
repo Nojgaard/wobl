@@ -11,6 +11,19 @@ dependencies = [
     "mujoco==3.3.5",
     "numpy>=2.3.5",
     "protobuf>=6.32.1",
+    "pyserial>=3.5",
     "rerun-sdk>=0.27.2",
     "simple-pid>=2.0.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-m", "not hardware"]
+markers = [
+    "hardware: requires a physical ESP32 connected over serial (run with -m hardware)",
 ]

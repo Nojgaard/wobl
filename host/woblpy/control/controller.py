@@ -7,7 +7,7 @@ from woblpy.control.diff_drive_kinematics import DiffDriveKinematics
 from woblpy.control.kalman_filter import KalmanFilter
 from woblpy.control.linear_filter import LinearFilter
 from woblpy.control.lqr import compute_lqr_gains
-from woblpy.messages.messages_pb2 import Imu, JointCommand, JointState
+from woblpy.hardware.protocol import DriveCommand, DriveTelemetry
 
 
 class Controller:
@@ -43,21 +43,18 @@ class Controller:
 
         self.diff_drive = DiffDriveKinematics(0.3, 0.04, 10.0)
 
-    def update_imu(self, imu: Imu):
-        q = imu.orientation
-        if np.linalg.norm([q.x, q.y, q.z, q.w]) == 0:
+    def update_drive_telem(self, telem: DriveTelemetry) -> None:
+        w, x, y, z = telem.quat_wxyz
+        if w == 0.0 and x == 0.0 and y == 0.0 and z == 0.0:
             return
 
-        self.rpy = R.from_quat([q.x, q.y, q.z, q.w]).as_euler("XYZ")
+        self.rpy = R.from_quat([x, y, z, w]).as_euler("XYZ")
         self.roll, self.pitch, self.yaw = self.rpy
-        self.roll_rate.update(imu.angular_velocity.x)
-        self.pitch_rate.update(imu.angular_velocity.y)
+        self.roll_rate.update(telem.gyro[0])
+        self.pitch_rate.update(telem.gyro[1])
 
-    def update_joint_state(self, joint_state: JointState):
-        self.joint_state = joint_state
-        left_wheel_rps, right_wheel_rps = joint_state.velocity[2:]
         fwd_velocity, yaw_rate = self.diff_drive.forward_kinematics(
-            left_wheel_rps, right_wheel_rps
+            telem.left_vel, telem.right_vel
         )
         self.fwd_velocity.update(fwd_velocity)
         self.yaw_rate.update(yaw_rate)
@@ -84,7 +81,7 @@ class Controller:
         v_new = v + a * dt
         return v_new
 
-    def update(self, joint_command: JointCommand):
+    def update(self) -> DriveCommand:
         k_pitch = self._k[0]
         k_pitch_rate = self._k[1]
         k_position = self._k[2]
@@ -153,5 +150,9 @@ class Controller:
         left_torque = np.clip(left_torque, -1.96, 1.96)
         right_torque = np.clip(right_torque, -1.96, 1.96)
 
-        joint_command.velocity[2] = left_torque
-        joint_command.velocity[3] = right_torque
+        return DriveCommand(
+            left_enabled=True,
+            left_velocity=float(left_torque),
+            right_enabled=True,
+            right_velocity=float(right_torque),
+        )
