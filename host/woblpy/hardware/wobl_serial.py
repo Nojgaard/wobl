@@ -157,7 +157,10 @@ class WoblSerial:
                 time.sleep(0.0001)
 
     def _process_frame(self, raw: bytes) -> None:
-        decoded = cobs.decode(raw)
+        try:
+            decoded = cobs.decode(raw)
+        except Exception:
+            return  # malformed frame (e.g. garbage from ESP32 boot output)
         if len(decoded) < 3:
             return
         expected = _crc16(decoded[:-2])

@@ -1,300 +1,6 @@
 #include <imu.hpp>
 #include "debug.hpp"
 
-// Override of the weak ICM_20948::initializeDMP from the SparkFun library.
-//
-// WHAT CHANGED vs the library default (divider=19, ~56Hz):
-//   The library only has three sets of self-consistent DMP constants,
-//   corresponding to the three rates documented in InvenSense's confidential
-//   Application Note:
-//     divider=19 -> ~56Hz  (library default)
-//     divider=8  -> ~112Hz (this override)
-//     divider=4  -> ~225Hz
-//   Any other divider (e.g. 10 for ~100Hz) has no published constants and is
-//   unsafe.
-//
-//   The four places that must change together when changing rate:
-//     1. mySmplrt.g / mySmplrt.a  — hardware sample rate divider register
-//     2. setGyroSF(div, level)     — DMP gyro scale factor; converts raw LSBs
-//     to
-//                                    angle-per-step. Wrong value -> quaternion
-//                                    rotates at the wrong speed (proportional
-//                                    to rate error).
-//     3. ACCEL_ONLY_GAIN           — accel correction gain in the complementary
-//     filter.
-//                                    Wrong value -> poor levelling when
-//                                    stationary.
-//     4. ACCEL_ALPHA_VAR /         — exponential smoothing weights for the
-//     complementary
-//        ACCEL_A_VAR                 filter. Wrong values ->
-//        over/under-trusting accel,
-//                                    causing jitter or drift.
-//
-//   The magic byte values for (3) and (4) originate from InvenSense's internal
-//   documentation and are available verbatim as commented-out alternatives in
-//   the SparkFun library's ICM_20948.cpp (search for "112Hz").
-//
-// UNCHANGED vs the library: all register configuration, FSR settings, mount
-// matrices, firmware loading, and compass setup are identical.
-ICM_20948_Status_e ICM_20948::initializeDMP(void) {
-  if (_device._dmp_firmware_available != true)
-    return ICM_20948_Stat_DMPNotSupported;
-
-#if defined(ICM_20948_USE_DMP)
-  ICM_20948_Status_e result = ICM_20948_Stat_Ok;
-  ICM_20948_Status_e worstResult = ICM_20948_Stat_Ok;
-
-  // Configure magnetometer for DMP (single-measurement mode via I2C master)
-  // Unchanged from library default.
-  result = i2cControllerConfigurePeripheral(0, MAG_AK09916_I2C_ADDR,
-                                            AK09916_REG_RSV2, 10, true, true,
-                                            false, true, true);
-  if (result > worstResult)
-    worstResult = result;
-  result = i2cControllerConfigurePeripheral(
-      1, MAG_AK09916_I2C_ADDR, AK09916_REG_CNTL2, 1, false, true, false, false,
-      false, AK09916_mode_single);
-  if (result > worstResult)
-    worstResult = result;
-
-  // I2C master ODR: 1100 / 2^4 = 68.75Hz. Unchanged from library default.
-  result = setBank(3);
-  if (result > worstResult)
-    worstResult = result;
-  uint8_t mstODRconfig = 0x04;
-  result = write(AGB3_REG_I2C_MST_ODR_CONFIG, &mstODRconfig, 1);
-  if (result > worstResult)
-    worstResult = result;
-
-  result = setClockSource(ICM_20948_Clock_Auto);
-  if (result > worstResult)
-    worstResult = result;
-
-  result = setBank(0);
-  if (result > worstResult)
-    worstResult = result;
-  uint8_t pwrMgmt2 = 0x40;
-  result = write(AGB0_REG_PWR_MGMT_2, &pwrMgmt2, 1);
-  if (result > worstResult)
-    worstResult = result;
-
-  result = setSampleMode(ICM_20948_Internal_Mst, ICM_20948_Sample_Mode_Cycled);
-  if (result > worstResult)
-    worstResult = result;
-  result = enableFIFO(false);
-  if (result > worstResult)
-    worstResult = result;
-  result = enableDMP(false);
-  if (result > worstResult)
-    worstResult = result;
-
-  // FSR: accel=4g, gyro=2000dps. Unchanged from library default.
-  // These must match the DMP scale constants (ACC_SCALE, GYRO_FULLSCALE)
-  // written below.
-  ICM_20948_fss_t myFSS;
-  myFSS.a = gpm4;
-  myFSS.g = dps2000;
-  result =
-      setFullScale((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), myFSS);
-  if (result > worstResult)
-    worstResult = result;
-  result = enableDLPF(ICM_20948_Internal_Gyr, true);
-  if (result > worstResult)
-    worstResult = result;
-
-  // Clear FIFO inputs. Unchanged from library default.
-  result = setBank(0);
-  if (result > worstResult)
-    worstResult = result;
-  uint8_t zero = 0;
-  result = write(AGB0_REG_FIFO_EN_1, &zero, 1);
-  if (result > worstResult)
-    worstResult = result;
-  result = write(AGB0_REG_FIFO_EN_2, &zero, 1);
-  if (result > worstResult)
-    worstResult = result;
-  result = intEnableRawDataReady(false);
-  if (result > worstResult)
-    worstResult = result;
-  result = resetFIFO();
-  if (result > worstResult)
-    worstResult = result;
-
-  // CHANGE 1/4: Sample rate divider.
-  // Library default: mySmplrt.g/a = 19  -> 1100/(1+19) = 55Hz,  1125/(1+19) =
-  // 56Hz This override:   mySmplrt.g/a = 8   -> 1100/(1+8)  = 122Hz, 1125/(1+8)
-  // = 125Hz
-  ICM_20948_smplrt_t mySmplrt;
-  mySmplrt.g = 8;
-  mySmplrt.a = 8;
-  result = setSampleRate((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr),
-                         mySmplrt);
-  if (result > worstResult)
-    worstResult = result;
-
-  result = setDMPstartAddress();
-  if (result > worstResult)
-    worstResult = result;
-  result = loadDMPFirmware();
-  if (result > worstResult)
-    worstResult = result;
-  result = setDMPstartAddress();
-  if (result > worstResult)
-    worstResult = result;
-
-  result = setBank(0);
-  if (result > worstResult)
-    worstResult = result;
-  uint8_t fix = 0x48;
-  result = write(AGB0_REG_HW_FIX_DISABLE, &fix, 1);
-  if (result > worstResult)
-    worstResult = result;
-
-  result = setBank(0);
-  if (result > worstResult)
-    worstResult = result;
-  uint8_t fifoPrio = 0xE4;
-  result = write(AGB0_REG_SINGLE_FIFO_PRIORITY_SEL, &fifoPrio, 1);
-  if (result > worstResult)
-    worstResult = result;
-
-  // Accel DMP scaling for gpm4. Unchanged from library default.
-  const unsigned char accScale[4] = {0x04, 0x00, 0x00, 0x00};
-  const unsigned char accScale2[4] = {0x00, 0x04, 0x00, 0x00};
-  result = writeDMPmems(ACC_SCALE, 4, &accScale[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(ACC_SCALE2, 4, &accScale2[0]);
-  if (result > worstResult)
-    worstResult = result;
-
-  // Compass and B2S mount matrices. Unchanged from library default.
-  const unsigned char zero4[4] = {0x00, 0x00, 0x00, 0x00};
-  const unsigned char plus[4] = {0x09, 0x99, 0x99, 0x99};
-  const unsigned char minus[4] = {0xF6, 0x66, 0x66, 0x67};
-  result = writeDMPmems(CPASS_MTX_00, 4, &plus[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(CPASS_MTX_01, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(CPASS_MTX_02, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(CPASS_MTX_10, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(CPASS_MTX_11, 4, &minus[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(CPASS_MTX_12, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(CPASS_MTX_20, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(CPASS_MTX_21, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(CPASS_MTX_22, 4, &minus[0]);
-  if (result > worstResult)
-    worstResult = result;
-
-  const unsigned char b2sPlus[4] = {0x40, 0x00, 0x00, 0x00};
-  result = writeDMPmems(B2S_MTX_00, 4, &b2sPlus[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(B2S_MTX_01, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(B2S_MTX_02, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(B2S_MTX_10, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(B2S_MTX_11, 4, &b2sPlus[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(B2S_MTX_12, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(B2S_MTX_20, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(B2S_MTX_21, 4, &zero4[0]);
-  if (result > worstResult)
-    worstResult = result;
-  result = writeDMPmems(B2S_MTX_22, 4, &b2sPlus[0]);
-  if (result > worstResult)
-    worstResult = result;
-
-  // CHANGE 2/4: Gyro scale factor.
-  // Converts raw gyro LSBs to the DMP's internal angle-per-step unit.
-  // Must match the hardware divider (arg 1) and FSR (arg 2: 3=2000dps).
-  // Library default: setGyroSF(19, 3)  -- calibrated for 55Hz
-  // This override:   setGyroSF(8, 3)   -- calibrated for 112Hz
-  // Source: InvenSense Application Note via SparkFun library setGyroSF
-  // implementation.
-  result = setGyroSF(8, 3);
-  if (result > worstResult)
-    worstResult = result;
-
-  // Gyro full-scale register for DMP (2000dps = 2^28). Unchanged from library
-  // default.
-  const unsigned char gyroFullScale[4] = {0x10, 0x00, 0x00, 0x00};
-  result = writeDMPmems(GYRO_FULLSCALE, 4, &gyroFullScale[0]);
-  if (result > worstResult)
-    worstResult = result;
-
-  // CHANGE 3/4: Accel-only correction gain.
-  // Controls how aggressively the accel corrects gyro drift when the robot is
-  // near-stationary. Values originate from InvenSense's confidential
-  // Application Note; the 56Hz/112Hz/225Hz variants are available as
-  // commented-out alternatives in the SparkFun library source. Library default:
-  // {0x03, 0xA4, 0x92, 0x49}  (56Hz,  = 61117001 decimal) This override: {0x01,
-  // 0xD1, 0x74, 0x5D}  (112Hz, = 30504029 decimal)
-  const unsigned char accelOnlyGain[4] = {0x01, 0xD1, 0x74, 0x5D};
-  result = writeDMPmems(ACCEL_ONLY_GAIN, 4, &accelOnlyGain[0]);
-  if (result > worstResult)
-    worstResult = result;
-
-  // CHANGE 4/4: Accel complementary filter smoothing weights.
-  // These two values set the exponential smoothing time constants for the
-  // accel-based tilt correction inside the DMP's fusion algorithm. Matching the
-  // rate prevents the filter from being too slow (drifts) or too fast
-  // (jittery). Values from InvenSense Application Note via SparkFun library
-  // commented-out alternatives. Library default: AlphaVar={0x34,0x92,0x49,0x25}
-  // AVar={0x0B,0x6D,0xB6,0xDB}  (56Hz) This override:
-  // AlphaVar={0x3A,0x49,0x24,0x92} AVar={0x05,0xB6,0xDB,0x6E}  (112Hz)
-  const unsigned char accelAlphaVar[4] = {0x3A, 0x49, 0x24, 0x92};
-  result = writeDMPmems(ACCEL_ALPHA_VAR, 4, &accelAlphaVar[0]);
-  if (result > worstResult)
-    worstResult = result;
-
-  const unsigned char accelAVar[4] = {0x05, 0xB6, 0xDB, 0x6E};
-  result = writeDMPmems(ACCEL_A_VAR, 4, &accelAVar[0]);
-  if (result > worstResult)
-    worstResult = result;
-
-  // Accel calibration rate and compass time buffer. Unchanged from library
-  // default.
-  const unsigned char accelCalRate[2] = {0x00, 0x00};
-  result = writeDMPmems(ACCEL_CAL_RATE, 2, &accelCalRate[0]);
-  if (result > worstResult)
-    worstResult = result;
-
-  const unsigned char compassRate[2] = {0x00, 0x45}; // 69Hz
-  result = writeDMPmems(CPASS_TIME_BUFFER, 2, &compassRate[0]);
-  if (result > worstResult)
-    worstResult = result;
-
-  return worstResult;
-#else
-  return ICM_20948_Stat_DMPNotSupported;
-#endif
-}
-
 // IMU bias values from calibration
 const int32_t BIAS_LINEAR_ACCELERATION[3] = {-330752, -826368, 585728};
 const int32_t BIAS_ANGULAR_VELOCITY[3] = {-17440, 1344, 12768};
@@ -319,9 +25,27 @@ bool IMU::initialize(SPIClass &spi, uint8_t csPin) {
 
   check(icm_.initializeDMP(), "initializeDMP");
 
-  check(icm_.enableDMPSensor(INV_ICM20948_SENSOR_ORIENTATION),
-        "enableDMPSensor");
-  check(icm_.setDMPODRrate(DMP_ODR_Reg_Quat9, 0), "setDMPODRrate");
+  // The weak initializeDMP override in this file may not be invoked by the
+  // ESP32 linker. Patch the four rate-dependent DMP constants here explicitly
+  // to guarantee 225Hz (divider=4: gyro ~220Hz, accel ~225Hz).
+  // Values from InvenSense Application Note (see initializeDMP comments).
+  ICM_20948_smplrt_t smplrt;
+  smplrt.g = 4;
+  smplrt.a = 4;
+  check(icm_.setSampleRate((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), smplrt), "setSampleRate");
+  check(icm_.setGyroSF(4, 3), "setGyroSF"); // divider=4, 2000dps
+  const unsigned char accelOnlyGain[4] = {0x00, 0xE8, 0xBA, 0x2E}; // 225Hz
+  check(icm_.writeDMPmems(ACCEL_ONLY_GAIN, 4, &accelOnlyGain[0]), "ACCEL_ONLY_GAIN");
+  const unsigned char accelAlphaVar[4] = {0x3D, 0x27, 0xD2, 0x7D}; // 225Hz
+  check(icm_.writeDMPmems(ACCEL_ALPHA_VAR, 4, &accelAlphaVar[0]), "ACCEL_ALPHA_VAR");
+  const unsigned char accelAVar[4]     = {0x02, 0xD8, 0x2D, 0x83}; // 225Hz
+  check(icm_.writeDMPmems(ACCEL_A_VAR, 4, &accelAVar[0]), "ACCEL_A_VAR");
+
+  // Use Quat6 (6-axis game rotation vector, no magnetometer). Yaw drift is
+  // acceptable for a self-balancing robot, and Quat6 is not rate-limited by
+  // the magnetometer ODR (68.75Hz) that caps Quat9 at ~56Hz.
+  check(icm_.enableDMPSensor(INV_ICM20948_SENSOR_GAME_ROTATION_VECTOR), "enableDMPSensor");
+  check(icm_.setDMPODRrate(DMP_ODR_Reg_Quat6, 0), "setDMPODRrate");
   check(icm_.enableFIFO(), "enableFIFO");
   check(icm_.enableDMP(), "enableDMP");
   check(icm_.resetDMP(), "resetDMP");
@@ -342,10 +66,10 @@ bool IMU::try_read(IMU::Data &out_data) {
 
   while ((icm_.status == ICM_20948_Stat_Ok) ||
          (icm_.status == ICM_20948_Stat_FIFOMoreDataAvail)) {
-    if (data_dmp_.header & DMP_header_bitmap_Quat9) {
-      float q1 = data_dmp_.Quat9.Data.Q1 * quat9_scale;
-      float q2 = data_dmp_.Quat9.Data.Q2 * quat9_scale;
-      float q3 = data_dmp_.Quat9.Data.Q3 * quat9_scale;
+    if (data_dmp_.header & DMP_header_bitmap_Quat6) {
+      float q1 = data_dmp_.Quat6.Data.Q1 * quat9_scale;
+      float q2 = data_dmp_.Quat6.Data.Q2 * quat9_scale;
+      float q3 = data_dmp_.Quat6.Data.Q3 * quat9_scale;
       float q0_sq = 1.0f - (q1 * q1 + q2 * q2 + q3 * q3);
       float q0 = q0_sq > 0.0f ? std::sqrt(q0_sq)
                               : 0.0f; // guard against drift-induced NaN
