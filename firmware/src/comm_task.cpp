@@ -1,0 +1,266 @@
+#include "comm_task.hpp"
+#include "cobs.hpp"
+
+#include <Arduino.h>
+#include <string.h>
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+static constexpr uint32_t kBaudRate = 1000000;
+static constexpr uint32_t kHeartbeatTimeoutMs = 200;
+static constexpr size_t kRxBufSize = 256;
+static constexpr float kMaxWheelVelocity = 50.0f; // rad/s
+
+// ---------------------------------------------------------------------------
+// CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF, no reflect)
+// Computed over [type byte][body bytes].
+// ---------------------------------------------------------------------------
+static uint16_t crc16(const uint8_t *data, size_t len) {
+  uint16_t crc = 0xFFFF;
+  for (size_t i = 0; i < len; i++) {
+    crc ^= (uint16_t)data[i] << 8;
+    for (int j = 0; j < 8; j++) {
+      crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : (crc << 1);
+    }
+  }
+  return crc;
+}
+
+// ---------------------------------------------------------------------------
+// Packet TX helper
+// Payload layout (before COBS): [type][body...][crc_hi][crc_lo]
+// ---------------------------------------------------------------------------
+// COBS overhead: at most ceil(n/254) extra bytes; +1 is sufficient for payloads
+// ≤ 254 bytes, +2 covers up to 508 bytes. kRxBufSize=256 → max encoded = 258.
+static constexpr size_t kMaxCobsEncodedSize = kRxBufSize + 2;
+static uint8_t txEncoded[kMaxCobsEncodedSize];
+
+static void sendPacket(uint8_t type, const void *body, size_t bodyLen) {
+  // Build raw payload in a local buffer
+  uint8_t payload[kRxBufSize];
+  size_t payloadLen = 1 + bodyLen + 2;
+
+  payload[0] = type;
+  if (body && bodyLen > 0) {
+    memcpy(payload + 1, body, bodyLen);
+  }
+
+  uint16_t crc = crc16(payload, 1 + bodyLen);
+  payload[1 + bodyLen] = (uint8_t)(crc >> 8);
+  payload[1 + bodyLen + 1] = (uint8_t)(crc & 0xFF);
+
+  size_t encodedLen = cobs_encode(payload, payloadLen, txEncoded);
+  Serial.write(txEncoded, encodedLen);
+  Serial.write((uint8_t)0x00);
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
+static void handleDriveCmd(SharedState *state, const uint8_t *body,
+                           size_t len) {
+  if (len != sizeof(WireDriveCmd))
+    return;
+
+  WireDriveCmd cmd;
+  memcpy(&cmd, body, sizeof(cmd));
+
+  // Clamp velocities before writing to shared state
+  auto clamp = [](float v, float limit) -> float {
+    return v < -limit ? -limit : (v > limit ? limit : v);
+  };
+
+  WheelsCommand wc;
+  wc.left.enabled = cmd.leftWheel.enabled != 0;
+  wc.left.velocity = clamp(cmd.leftWheel.velocity, kMaxWheelVelocity);
+  wc.right.enabled = cmd.rightWheel.enabled != 0;
+  wc.right.velocity = clamp(cmd.rightWheel.velocity, kMaxWheelVelocity);
+  state->commands.wheels.write(wc);
+}
+
+static void sendDriveTelem(SharedState *state) {
+  IMU::Data imu = state->telemetry.imu.read();
+  WheelsData wheels = state->telemetry.wheels.read();
+
+  WireDriveTelem telem;
+  telem.quatWXYZ[0] = imu.orientation[3]; // ICM stores [q1,q2,q3,q0]
+  telem.quatWXYZ[1] = imu.orientation[0];
+  telem.quatWXYZ[2] = imu.orientation[1];
+  telem.quatWXYZ[3] = imu.orientation[2];
+  telem.gyr[0] = imu.gyr[0];
+  telem.gyr[1] = imu.gyr[1];
+  telem.gyr[2] = imu.gyr[2];
+  telem.leftAngle = wheels.left.angle;
+  telem.leftVel = wheels.left.velocity;
+  telem.rightAngle = wheels.right.angle;
+  telem.rightVel = wheels.right.velocity;
+  telem.timestampMs = (uint32_t)millis();
+
+  sendPacket(MSG_TELEM_DRIVE, &telem, sizeof(telem));
+}
+
+static void handlePoseCmd(SharedState *state, const uint8_t *body, size_t len) {
+  if (len != sizeof(WirePoseCmd))
+    return;
+
+  WirePoseCmd cmd;
+  memcpy(&cmd, body, sizeof(cmd));
+
+  ServosCommand sc;
+  sc.left.enabled = cmd.leftServo.enabled != 0;
+  sc.left.positionRad = cmd.leftServo.positionRad;
+  sc.right.enabled = cmd.rightServo.enabled != 0;
+  sc.right.positionRad = cmd.rightServo.positionRad;
+  state->commands.servos.write(sc);
+}
+
+static void sendPoseTelem(SharedState *state) {
+  ServosData servos = state->telemetry.servos.read();
+
+  WirePoseTelem telem;
+  telem.leftValid = servos.left.valid ? 1 : 0;
+  telem.rightValid = servos.right.valid ? 1 : 0;
+  telem.leftPos = servos.left.positionRad;
+  telem.leftVel = servos.left.velocityRps;
+  telem.leftEffort = servos.left.effortPct;
+  telem.rightPos = servos.right.positionRad;
+  telem.rightVel = servos.right.velocityRps;
+  telem.rightEffort = servos.right.effortPct;
+
+  sendPacket(MSG_TELEM_POSE, &telem, sizeof(telem));
+}
+
+static void handleStatusReq(SharedState *state, size_t bodyLen) {
+  if (bodyLen != 0)
+    return;
+
+  IMUStatus imuSt = state->status.imu.read();
+  WheelsStatus wheelSt = state->status.wheels.read();
+  ServosStatus servoSt = state->status.servos.read();
+
+  WireStatus s;
+  s.imuStatus = imuSt.status;
+  s.imuUpdateRate = imuSt.updateRate;
+  s.wheelsFocRate = wheelSt.focRate;
+  s.wheelsUpdateRate = wheelSt.updateRate;
+  s.wheelsLeftStatus = wheelSt.leftStatus;
+  s.wheelsRightStatus = wheelSt.rightStatus;
+  s.servoLeftOk = servoSt.leftOk ? 1 : 0;
+  s.servoRightOk = servoSt.rightOk ? 1 : 0;
+
+  sendPacket(MSG_STATUS, &s, sizeof(s));
+}
+
+static void handleCalibWrite(const uint8_t *body, size_t len) {
+  if (len != sizeof(WireCalibPayload))
+    return;
+  // Stub: acknowledge, implementation deferred
+  WireCalibAck ack = {0};
+  sendPacket(MSG_CALIB_ACK, &ack, sizeof(ack));
+}
+
+static void handleCalibReadReq(const uint8_t *body, size_t len) {
+  if (len != 1)
+    return;
+  // Stub: return zeroed payload for requested target
+  WireCalibPayload payload = {};
+  payload.target = body[0];
+  sendPacket(MSG_CALIB_DATA, &payload, sizeof(payload));
+}
+
+// ---------------------------------------------------------------------------
+// Packet dispatcher — called after CRC is verified
+// decoded[0] = type, decoded[1..n-3] = body, decoded[n-2..n-1] = CRC (consumed)
+// ---------------------------------------------------------------------------
+static void dispatch(SharedState *state, const uint8_t *decoded, size_t decLen,
+                     uint32_t &lastDriveTime, uint32_t &lastPoseTime) {
+  if (decLen < 3)
+    return; // minimum: type(1) + crc(2)
+
+  uint8_t type = decoded[0];
+  const uint8_t *body = decoded + 1;
+  size_t bodyLen = decLen - 3; // strip type and 2 CRC bytes
+
+  switch (type) {
+  case MSG_CMD_DRIVE:
+    handleDriveCmd(state, body, bodyLen);
+    lastDriveTime = millis();
+    sendDriveTelem(state);
+    break;
+  case MSG_CMD_POSE:
+    handlePoseCmd(state, body, bodyLen);
+    lastPoseTime = millis();
+    sendPoseTelem(state);
+    break;
+  case MSG_STATUS_REQ:
+    handleStatusReq(state, bodyLen);
+    break;
+  case MSG_CALIB_WRITE:
+    handleCalibWrite(body, bodyLen);
+    break;
+  case MSG_CALIB_READ_REQ:
+    handleCalibReadReq(body, bodyLen);
+    break;
+  default:
+    break; // unknown type — silent drop
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Frame processing — COBS-decode, verify CRC, dispatch
+// ---------------------------------------------------------------------------
+static void processFrame(SharedState *state, const uint8_t *raw, size_t rawLen,
+                         uint32_t &lastDriveTime, uint32_t &lastPoseTime) {
+  static uint8_t decoded[kRxBufSize];
+  size_t decLen = cobs_decode(raw, rawLen, decoded);
+  if (decLen < 3)
+    return;
+  uint16_t expected = crc16(decoded, decLen - 2);
+  uint16_t received =
+      ((uint16_t)decoded[decLen - 2] << 8) | decoded[decLen - 1];
+  if (expected == received)
+    dispatch(state, decoded, decLen, lastDriveTime, lastPoseTime);
+}
+
+// ---------------------------------------------------------------------------
+// Task
+// ---------------------------------------------------------------------------
+void commTaskInit(SharedState &state) { Serial.begin(kBaudRate); }
+
+void commTask(void *parameters) {
+  auto *state = static_cast<SharedState *>(parameters);
+
+  static uint8_t rxBuf[kRxBufSize];
+  size_t rxLen = 0;
+
+  uint32_t lastDriveTime = millis();
+  uint32_t lastPoseTime = millis();
+
+  for (;;) {
+    // --- RX: accumulate bytes until 0x00 delimiter ---
+    while (Serial.available()) {
+      uint8_t b = (uint8_t)Serial.read();
+
+      if (b == 0x00) {
+        if (rxLen > 0) {
+          processFrame(state, rxBuf, rxLen, lastDriveTime, lastPoseTime);
+          rxLen = 0;
+        }
+      } else {
+        rxBuf[rxLen++] = b;
+        if (rxLen >= kRxBufSize)
+          rxLen = 0; // overflow guard
+      }
+    }
+
+    // --- Heartbeat: disable actuators if no CMD received ---
+    uint32_t now = millis();
+    if (now - lastDriveTime > kHeartbeatTimeoutMs)
+      state->commands.wheels.write(WheelsCommand{});
+    if (now - lastPoseTime > kHeartbeatTimeoutMs)
+      state->commands.servos.write(ServosCommand{});
+
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
