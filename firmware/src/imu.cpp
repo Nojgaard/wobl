@@ -41,11 +41,11 @@ bool IMU::initialize(SPIClass &spi, uint8_t csPin) {
   const unsigned char accelAVar[4]     = {0x02, 0xD8, 0x2D, 0x83}; // 225Hz
   check(icm_.writeDMPmems(ACCEL_A_VAR, 4, &accelAVar[0]), "ACCEL_A_VAR");
 
-  // Use Quat6 (6-axis game rotation vector, no magnetometer). Yaw drift is
-  // acceptable for a self-balancing robot, and Quat6 is not rate-limited by
+  // Use Quat9 (9-axis orientation vector, includes magnetometer). Yaw drift is
+  // acceptable for a self-balancing robot, and Quat9 is not rate-limited by
   // the magnetometer ODR (68.75Hz) that caps Quat9 at ~56Hz.
-  check(icm_.enableDMPSensor(INV_ICM20948_SENSOR_GAME_ROTATION_VECTOR), "enableDMPSensor");
-  check(icm_.setDMPODRrate(DMP_ODR_Reg_Quat6, 0), "setDMPODRrate");
+  check(icm_.enableDMPSensor(INV_ICM20948_SENSOR_ORIENTATION), "enableDMPSensor");
+  check(icm_.setDMPODRrate(DMP_ODR_Reg_Quat9, 0), "setDMPODRrate");
   check(icm_.enableFIFO(), "enableFIFO");
   check(icm_.enableDMP(), "enableDMP");
   check(icm_.resetDMP(), "resetDMP");
@@ -66,10 +66,10 @@ bool IMU::try_read(IMU::Data &out_data) {
 
   while ((icm_.status == ICM_20948_Stat_Ok) ||
          (icm_.status == ICM_20948_Stat_FIFOMoreDataAvail)) {
-    if (data_dmp_.header & DMP_header_bitmap_Quat6) {
-      float q1 = data_dmp_.Quat6.Data.Q1 * quat9_scale;
-      float q2 = data_dmp_.Quat6.Data.Q2 * quat9_scale;
-      float q3 = data_dmp_.Quat6.Data.Q3 * quat9_scale;
+    if (data_dmp_.header & DMP_header_bitmap_Quat9) {
+      float q1 = data_dmp_.Quat9.Data.Q1 * quat9_scale;
+      float q2 = data_dmp_.Quat9.Data.Q2 * quat9_scale;
+      float q3 = data_dmp_.Quat9.Data.Q3 * quat9_scale;
       float q0_sq = 1.0f - (q1 * q1 + q2 * q2 + q3 * q3);
       float q0 = q0_sq > 0.0f ? std::sqrt(q0_sq)
                               : 0.0f; // guard against drift-induced NaN
