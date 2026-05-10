@@ -17,7 +17,6 @@ from __future__ import annotations
 import queue
 import struct
 import threading
-import time
 from typing import Optional
 
 import serial
@@ -153,8 +152,6 @@ class WoblSerial:
                             buf.clear()
                     else:
                         buf.append(b)
-            else:
-                time.sleep(0.0001)
 
     def _process_frame(self, raw: bytes) -> None:
         try:
