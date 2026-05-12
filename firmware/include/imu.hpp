@@ -10,16 +10,25 @@ public:
     float gyr[3];
   };
 
+  struct Calibration {
+    int32_t gyro[3]{};
+    int32_t accel[3]{};
+    int32_t mag[3]{};
+  };
+
   IMU();
   bool initialize(SPIClass &spi, uint8_t csPin);
   bool try_read(IMU::Data &data);
   bool status() const;
-  void print_biases();
+  IMU::Calibration load_biases();  // Load from NVS (or factory defaults), configure DMP, return loaded state
+  IMU::Calibration save_biases();  // Read DMP state, persist to NVS, return what was saved
+  void print_biases();             // Debug: print current DMP state
 
   ICM_20948_SPI icm_;
 
-private:
-  void load_biases();
-
   icm_20948_DMP_data_t data_dmp_;
+
+private:
+  void set_dmp_biases(const IMU::Calibration &cal);  // Internal: write calibration values to DMP
+  IMU::Calibration get_dmp_biases();                 // Internal: read calibration values from DMP
 };

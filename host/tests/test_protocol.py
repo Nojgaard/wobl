@@ -45,7 +45,7 @@ def test_status_size() -> None:
 
 
 def test_calib_payload_size() -> None:
-    assert _FMT_CALIB_PAYLOAD.size == 25
+    assert _FMT_CALIB_PAYLOAD.size == 37
 
 
 def test_calib_ack_size() -> None:
@@ -119,13 +119,18 @@ def test_status_pack_unpack() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CalibPayload round-trip
+# CalibPayload round-trip (read response only — write is a bare trigger byte)
 # ---------------------------------------------------------------------------
 
 def test_calib_payload_pack_unpack() -> None:
-    packed = _FMT_CALIB_PAYLOAD.pack(2, 0.01, -0.02, 0.03, 0.1, -0.2, 0.3)
-    assert len(packed) == 25
-    target, gx, gy, gz, ax, ay, az = _FMT_CALIB_PAYLOAD.unpack(packed)
-    assert target == 2
-    assert abs(gz - 0.03) < 1e-6
-    assert abs(az - 0.3) < 1e-6
+    # 9 int32_t values (gyro[3], accel[3], mag[3]) + 1 uint8_t target = 37 bytes
+    gyro = (-17440, 1344, 12768)
+    accel = (-330752, -826368, 585728)
+    mag = (-230400, 2479070, -3262980)
+    packed = _FMT_CALIB_PAYLOAD.pack(0, *gyro, *accel, *mag)
+    assert len(packed) == 37
+    t, gx, gy, gz, ax, ay, az, mx, my, mz = _FMT_CALIB_PAYLOAD.unpack(packed)
+    assert t == 0
+    assert (gx, gy, gz) == gyro
+    assert (ax, ay, az) == accel
+    assert (mx, my, mz) == mag

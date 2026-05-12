@@ -52,11 +52,11 @@ _MSG_CALIB_DATA = 0x0A
 #        STATUS=26, CALIB_PAYLOAD=25, CALIB_ACK=1
 # ---------------------------------------------------------------------------
 _FMT_DRIVE_CMD = struct.Struct("<BfBf")       # enabled_l, vel_l, enabled_r, vel_r
-_FMT_DRIVE_TELEM = struct.Struct("<11fI")     # 4 quat + 3 gyr + la + lv + ra + rv + ts_ms
+_FMT_DRIVE_TELEM = struct.Struct("<11fI")     # 4 quat(xyzw) + 3 gyr + la + lv + ra + rv + ts_ms
 _FMT_POSE_CMD = struct.Struct("<BfBf")        # enabled_l, pos_l, enabled_r, pos_r
 _FMT_POSE_TELEM = struct.Struct("<BB6f")      # valid_l, valid_r, lp, lv, le, rp, rv, re
 _FMT_STATUS = struct.Struct("<ifffiiBB")      # imu_st, imu_hz, foc_hz, whl_hz, l_st, r_st, l_ok, r_ok
-_FMT_CALIB_PAYLOAD = struct.Struct("<B6f")    # target, gyr[3], acc[3]
+_FMT_CALIB_PAYLOAD = struct.Struct("<B9i")    # target, gyr[3], acc[3], mag[3] — int32_t LSBs
 _FMT_CALIB_ACK = struct.Struct("<B")          # success
 
 # VIDs for common ESP32 USB-serial bridge chips
@@ -202,9 +202,9 @@ class WoblSerial:
         )
         self._send(_MSG_CMD_DRIVE, body)
         raw = self._recv(_MSG_TELEM_DRIVE)
-        w, x, y, z, gx, gy, gz, la, lv, ra, rv, ts = _FMT_DRIVE_TELEM.unpack(raw)
+        x, y, z, w, gx, gy, gz, la, lv, ra, rv, ts = _FMT_DRIVE_TELEM.unpack(raw)
         return DriveTelemetry(
-            quat_wxyz=(w, x, y, z),
+            quat_xyzw=(x, y, z, w),
             gyro=(gx, gy, gz),
             left_angle=la,
             left_vel=lv,
@@ -249,13 +249,9 @@ class WoblSerial:
             right_servo_ok=bool(r_ok),
         )
 
-    def write_calib(self, payload: CalibPayload) -> bool:
-        body = _FMT_CALIB_PAYLOAD.pack(
-            payload.target,
-            *payload.gyro_offset,
-            *payload.accel_offset,
-        )
-        self._send(_MSG_CALIB_WRITE, body)
+    def write_calib(self, target: int) -> bool:
+        """Trigger the device to persist its current calibration state to NVS."""
+        self._send(_MSG_CALIB_WRITE, bytes([target]))
         raw = self._recv(_MSG_CALIB_ACK)
         (success,) = _FMT_CALIB_ACK.unpack(raw)
         return bool(success)
@@ -263,8 +259,13 @@ class WoblSerial:
     def read_calib(self, target: int) -> CalibPayload:
         self._send(_MSG_CALIB_READ_REQ, bytes([target]))
         raw = self._recv(_MSG_CALIB_DATA)
-        t, gx, gy, gz, ax, ay, az = _FMT_CALIB_PAYLOAD.unpack(raw)
-        return CalibPayload(target=t, gyro_offset=(gx, gy, gz), accel_offset=(ax, ay, az))
+        t, gx, gy, gz, ax, ay, az, mx, my, mz = _FMT_CALIB_PAYLOAD.unpack(raw)
+        return CalibPayload(
+            target=t,
+            gyro_offset=(gx, gy, gz),
+            accel_offset=(ax, ay, az),
+            mag_offset=(mx, my, mz),
+        )
 
     # ------------------------------------------------------------------
     # Lifecycle

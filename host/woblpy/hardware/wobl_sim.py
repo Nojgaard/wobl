@@ -63,7 +63,7 @@ class WoblSim:
 
     def _update(self, timestep: TimeStep) -> np.ndarray:
         obs = timestep.observation
-        orientation = obs["robot/orientation"]       # framequat [w, x, y, z]
+        orientation = obs["robot/orientation"]       # framequat [x, y, z, w]
         gyr = obs["robot/angular_velocity"]
         joint_pos = obs["robot/joint_positions"]
         joint_vel = obs["robot/joint_velocities"]
@@ -74,11 +74,11 @@ class WoblSim:
         right_vel = _quantize(float(joint_vel[3]))
 
         drive_telem = DriveTelemetry(
-            quat_wxyz=(
+            quat_xyzw=(
+                float(orientation[3]),
                 float(orientation[0]),
                 float(orientation[1]),
                 float(orientation[2]),
-                float(orientation[3]),
             ),
             gyro=(float(gyr[0]), float(gyr[1]), float(gyr[2])),
             left_angle=float(joint_pos[2]),

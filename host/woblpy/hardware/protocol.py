@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from scipy.spatial.transform import Rotation as R
+
 
 @dataclass
 class DriveCommand:
@@ -25,8 +27,8 @@ class DriveCommand:
 class DriveTelemetry:
     """Telemetry received as MSG_TELEM_DRIVE."""
 
-    quat_wxyz: tuple[float, float, float, float] = field(
-        default_factory=lambda: (1.0, 0.0, 0.0, 0.0)
+    quat_xyzw: tuple[float, float, float, float] = field(
+        default_factory=lambda: (0.0, 0.0, 0.0, 1.0)
     )
     gyro: tuple[float, float, float] = field(
         default_factory=lambda: (0.0, 0.0, 0.0)
@@ -36,6 +38,10 @@ class DriveTelemetry:
     right_angle: float = 0.0
     right_vel: float = 0.0
     timestamp_ms: int = 0
+
+    def orientation_euler(self) -> tuple[float, float, float]:
+        """Return roll, pitch, yaw in radians from the quaternion."""
+        return R.from_quat(self.quat_xyzw).as_euler("XYZ")
 
 
 @dataclass
@@ -78,14 +84,17 @@ class StatusData:
 
 @dataclass
 class CalibPayload:
-    """Shared layout for MSG_CALIB_WRITE and MSG_CALIB_DATA."""
+    """Response payload for MSG_CALIB_DATA (read result from device)."""
 
     target: int = 0
-    gyro_offset: tuple[float, float, float] = field(
-        default_factory=lambda: (0.0, 0.0, 0.0)
+    gyro_offset: tuple[int, int, int] = field(
+        default_factory=lambda: (0, 0, 0)
     )
-    accel_offset: tuple[float, float, float] = field(
-        default_factory=lambda: (0.0, 0.0, 0.0)
+    accel_offset: tuple[int, int, int] = field(
+        default_factory=lambda: (0, 0, 0)
+    )
+    mag_offset: tuple[int, int, int] = field(
+        default_factory=lambda: (0, 0, 0)
     )
 
 

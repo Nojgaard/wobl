@@ -1,10 +1,18 @@
 #include <imu.hpp>
 #include "debug.hpp"
 
-// IMU bias values from calibration
-const int32_t BIAS_LINEAR_ACCELERATION[3] = {-330752, -826368, 585728};
-const int32_t BIAS_ANGULAR_VELOCITY[3] = {-17440, 1344, 12768};
-const int32_t BIAS_COMPASS[3] = {-230400, 2479070, -3262980};
+#include <Preferences.h>
+
+// NVS namespace — owned by the IMU module, not visible to comm_task.
+static constexpr const char *kNvsNamespace = "wobl_calib";
+static constexpr const char *kNvsKeyGyro   = "gyro";
+static constexpr const char *kNvsKeyAccel  = "accel";
+static constexpr const char *kNvsKeyMag    = "mag";
+
+// Factory defaults applied when NVS is empty (first boot after flash).
+static const int32_t kDefaultBiasAccel[3] = {-330752, -826368, 585728};
+static const int32_t kDefaultBiasGyro[3]  = {-17440,    1344,  12768};
+static const int32_t kDefaultBiasMag[3]   = {-230400, 2479070, -3262980};
 
 IMU::IMU() {}
 
@@ -98,38 +106,75 @@ bool IMU::try_read(IMU::Data &out_data) {
   return got_data;
 }
 
-void IMU::load_biases() {
-  icm_.setBiasAccelX(BIAS_LINEAR_ACCELERATION[0]);
-  icm_.setBiasAccelY(BIAS_LINEAR_ACCELERATION[1]);
-  icm_.setBiasAccelZ(BIAS_LINEAR_ACCELERATION[2]);
+void IMU::set_dmp_biases(const IMU::Calibration &cal) {
+  icm_.setBiasAccelX(cal.accel[0]);
+  icm_.setBiasAccelY(cal.accel[1]);
+  icm_.setBiasAccelZ(cal.accel[2]);
 
-  icm_.setBiasGyroX(BIAS_ANGULAR_VELOCITY[0]);
-  icm_.setBiasGyroY(BIAS_ANGULAR_VELOCITY[1]);
-  icm_.setBiasGyroZ(BIAS_ANGULAR_VELOCITY[2]);
+  icm_.setBiasGyroX(cal.gyro[0]);
+  icm_.setBiasGyroY(cal.gyro[1]);
+  icm_.setBiasGyroZ(cal.gyro[2]);
 
-  icm_.setBiasCPassX(BIAS_COMPASS[0]);
-  icm_.setBiasCPassY(BIAS_COMPASS[1]);
-  icm_.setBiasCPassZ(BIAS_COMPASS[2]);
+  icm_.setBiasCPassX(cal.mag[0]);
+  icm_.setBiasCPassY(cal.mag[1]);
+  icm_.setBiasCPassZ(cal.mag[2]);
+}
+
+IMU::Calibration IMU::get_dmp_biases() {
+  IMU::Calibration cal;
+  icm_.getBiasAccelX(&cal.accel[0]);
+  icm_.getBiasAccelY(&cal.accel[1]);
+  icm_.getBiasAccelZ(&cal.accel[2]);
+
+  icm_.getBiasGyroX(&cal.gyro[0]);
+  icm_.getBiasGyroY(&cal.gyro[1]);
+  icm_.getBiasGyroZ(&cal.gyro[2]);
+
+  icm_.getBiasCPassX(&cal.mag[0]);
+  icm_.getBiasCPassY(&cal.mag[1]);
+  icm_.getBiasCPassZ(&cal.mag[2]);
+  return cal;
 }
 
 void IMU::print_biases() {
-  int32_t acc_x, acc_y, acc_z;
-  int32_t gyr_x, gyr_y, gyr_z;
-  int32_t mag_x, mag_y, mag_z;
-  icm_.getBiasAccelX(&acc_x);
-  icm_.getBiasAccelY(&acc_y);
-  icm_.getBiasAccelZ(&acc_z);
+  IMU::Calibration cal = get_dmp_biases();
+  DPRINTLN("Current biases:");
+  DPRINTF("  Accel: [%d, %d, %d]\n", cal.accel[0], cal.accel[1], cal.accel[2]);
+  DPRINTF("  Gyro:  [%d, %d, %d]\n", cal.gyro[0],  cal.gyro[1],  cal.gyro[2]);
+  DPRINTF("  Mag:   [%d, %d, %d]\n", cal.mag[0],   cal.mag[1],   cal.mag[2]);
+}
 
-  icm_.getBiasGyroX(&gyr_x);
-  icm_.getBiasGyroY(&gyr_y);
-  icm_.getBiasGyroZ(&gyr_z);
+IMU::Calibration IMU::save_biases() {
+  IMU::Calibration cal = get_dmp_biases();
 
-  icm_.getBiasCPassX(&mag_x);
-  icm_.getBiasCPassY(&mag_y);
-  icm_.getBiasCPassZ(&mag_z);
+  Preferences prefs;
+  prefs.begin(kNvsNamespace, false);
+  prefs.putBytes(kNvsKeyGyro,  cal.gyro,  sizeof(cal.gyro));
+  prefs.putBytes(kNvsKeyAccel, cal.accel, sizeof(cal.accel));
+  prefs.putBytes(kNvsKeyMag,   cal.mag,   sizeof(cal.mag));
+  prefs.end();
 
-  DPRINTLN("Loaded Biases:");
-  DPRINTF("  Linear Acceleration: [%d, %d, %d]\n", acc_x, acc_y, acc_z);
-  DPRINTF("  Angular Velocity:    [%d, %d, %d]\n", gyr_x, gyr_y, gyr_z);
-  DPRINTF("  Compass:             [%d, %d, %d]\n", mag_x, mag_y, mag_z);
+  return cal;
+}
+
+IMU::Calibration IMU::load_biases() {
+  IMU::Calibration cal = {
+    .gyro  = {kDefaultBiasGyro[0],  kDefaultBiasGyro[1],  kDefaultBiasGyro[2]},
+    .accel = {kDefaultBiasAccel[0], kDefaultBiasAccel[1], kDefaultBiasAccel[2]},
+    .mag   = {kDefaultBiasMag[0],   kDefaultBiasMag[1],   kDefaultBiasMag[2]}
+  };
+
+  Preferences prefs;
+  if (prefs.begin(kNvsNamespace, true)) { // read-only
+    prefs.getBytes(kNvsKeyGyro,  cal.gyro,  sizeof(cal.gyro));
+    prefs.getBytes(kNvsKeyAccel, cal.accel, sizeof(cal.accel));
+    prefs.getBytes(kNvsKeyMag,   cal.mag,   sizeof(cal.mag));
+    prefs.end();
+    DPRINTLN("IMU biases loaded from NVS");
+  } else {
+    DPRINTLN("IMU biases: NVS empty, using factory defaults");
+  }
+
+  set_dmp_biases(cal);
+  return get_dmp_biases();
 }

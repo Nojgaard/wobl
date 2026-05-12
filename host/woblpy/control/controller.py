@@ -1,7 +1,6 @@
 import time
 
 import numpy as np
-from scipy.spatial.transform import Rotation as R
 
 from woblpy.control.diff_drive_kinematics import DiffDriveKinematics
 from woblpy.control.kalman_filter import KalmanFilter
@@ -44,11 +43,10 @@ class Controller:
         self.diff_drive = DiffDriveKinematics(0.3, 0.04, 10.0)
 
     def update_drive_telem(self, telem: DriveTelemetry) -> None:
-        w, x, y, z = telem.quat_wxyz
-        if w == 0.0 and x == 0.0 and y == 0.0 and z == 0.0:
+        if sum(telem.quat_xyzw) == 0.0:
             return
 
-        self.rpy = R.from_quat([x, y, z, w]).as_euler("XYZ")
+        self.rpy = telem.orientation_euler()
         self.roll, self.pitch, self.yaw = self.rpy
         self.roll_rate.update(telem.gyro[0])
         self.pitch_rate.update(telem.gyro[1])

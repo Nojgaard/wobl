@@ -45,7 +45,7 @@ struct WireDriveCmd {
 
 // TELEM_DRIVE (0x02) — firmware → host
 struct WireDriveTelem {
-    float    quatWXYZ[4];   // orientation quaternion (w, x, y, z)
+    float    quatXYZW[4];   // orientation quaternion (x, y, z, w) — matches scipy.spatial.transform.Rotation.from_quat format
     float    gyr[3];        // body-frame angular velocity rad/s
     float    leftAngle;     // rad
     float    leftVel;       // rad/s
@@ -84,11 +84,13 @@ struct WireStatus {
     uint8_t servoRightOk;
 } __attribute__((packed));
 
-// CALIB_WRITE (0x07) / CALIB_DATA (0x0A) — shared layout
+// CALIB_DATA (0x0A) — firmware → host (response to CALIB_READ_REQ)
+// CALIB_WRITE (0x07) body is a single uint8_t target — no struct needed.
 struct WireCalibPayload {
     uint8_t target;
-    float   gyroOffset[3];  // rad/s
-    float   accelOffset[3]; // m/s²
+    int32_t gyroOffset[3];  // raw LSB (dps2000 scale)
+    int32_t accelOffset[3]; // raw LSB (gpm4 scale)
+    int32_t magOffset[3];   // raw LSB (compass)
 } __attribute__((packed));
 
 // CALIB_ACK (0x08)
@@ -99,5 +101,6 @@ struct WireCalibAck {
 // ---------------------------------------------------------------------------
 // Task interface
 // ---------------------------------------------------------------------------
+
 void commTaskInit(SharedState &state);
-void commTask(void *sharedState);
+void commTask(void *params); // SharedState*

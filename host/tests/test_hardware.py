@@ -76,7 +76,7 @@ def test_quaternion_unit_length(hw: WoblSerial) -> None:
     """Orientation quaternion magnitude must be ~1.0 (not zeroed/garbled)."""
     cmd = DriveCommand(left_enabled=False, right_enabled=False)
     telem = hw.step_drive(cmd)
-    w, x, y, z = telem.quat_wxyz
+    x, y, z, w = telem.quat_xyzw
     magnitude = math.sqrt(w**2 + x**2 + y**2 + z**2)
     assert abs(magnitude - 1.0) < 0.05, (
         f"Quaternion magnitude {magnitude:.4f} deviates from 1.0"
@@ -102,7 +102,7 @@ def test_pitch_roll_plausible(hw: WoblSerial) -> None:
 
     cmd = DriveCommand(left_enabled=False, right_enabled=False)
     telem = hw.step_drive(cmd)
-    w, x, y, z = telem.quat_wxyz
+    x, y, z, w = telem.quat_xyzw
     roll, pitch, _ = R.from_quat([x, y, z, w]).as_euler("XYZ")
     assert abs(roll) < math.radians(90), f"Roll {math.degrees(roll):.1f}° out of range"
     assert abs(pitch) < math.radians(90), f"Pitch {math.degrees(pitch):.1f}° out of range"
@@ -189,3 +189,29 @@ def test_corrupt_frame_ignored(hw: WoblSerial, serial_port: str | None) -> None:
     status = hw.request_status()
     assert status is not None, "Firmware failed to respond after a corrupt frame"
     assert status.imu_status == 0
+
+
+# ---------------------------------------------------------------------------
+# Calibration round-trip
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.hardware
+def test_calib_read_write_round_trip(hw: WoblSerial) -> None:
+    """Read current biases from the IMU, write them back, and verify the
+    values are identical (safe no-op round-trip — biases do not change)."""
+    original = hw.read_calib(target=0)
+
+    success = hw.write_calib(target=0)
+    assert success, "write_calib returned failure"
+
+    readback = hw.read_calib(target=0)
+    assert readback.gyro_offset == original.gyro_offset, (
+        f"Gyro mismatch: {original.gyro_offset} → {readback.gyro_offset}"
+    )
+    assert readback.accel_offset == original.accel_offset, (
+        f"Accel mismatch: {original.accel_offset} → {readback.accel_offset}"
+    )
+    assert readback.mag_offset == original.mag_offset, (
+        f"Mag mismatch: {original.mag_offset} → {readback.mag_offset}"
+    )

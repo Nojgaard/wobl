@@ -84,10 +84,10 @@ static void sendDriveTelem(SharedState *state) {
   WheelsData wheels = state->telemetry.wheels.read();
 
   WireDriveTelem telem;
-  telem.quatWXYZ[0] = imu.orientation[3]; // ICM stores [q1,q2,q3,q0]
-  telem.quatWXYZ[1] = imu.orientation[0];
-  telem.quatWXYZ[2] = imu.orientation[1];
-  telem.quatWXYZ[3] = imu.orientation[2];
+  telem.quatXYZW[0] = imu.orientation[0]; // ICM stores [q1,q2,q3,q0] → x
+  telem.quatXYZW[1] = imu.orientation[1]; // y
+  telem.quatXYZW[2] = imu.orientation[2]; // z
+  telem.quatXYZW[3] = imu.orientation[3]; // w
   telem.gyr[0] = imu.gyr[0];
   telem.gyr[1] = imu.gyr[1];
   telem.gyr[2] = imu.gyr[2];
@@ -152,20 +152,36 @@ static void handleStatusReq(SharedState *state, size_t bodyLen) {
   sendPacket(MSG_STATUS, &s, sizeof(s));
 }
 
-static void handleCalibWrite(const uint8_t *body, size_t len) {
-  if (len != sizeof(WireCalibPayload))
+static void handleCalibWrite(SharedState *state, const uint8_t *body, size_t len) {
+  if (len != 1)
     return;
-  // Stub: acknowledge, implementation deferred
-  WireCalibAck ack = {0};
+
+  uint8_t target = body[0];
+  uint8_t success = 0;
+
+  if (target == 0) { // IMU
+    state->calibration.imuReq.write(CalibReq{true});
+    success = 1;
+  }
+
+  WireCalibAck ack = {success};
   sendPacket(MSG_CALIB_ACK, &ack, sizeof(ack));
 }
 
-static void handleCalibReadReq(const uint8_t *body, size_t len) {
+static void handleCalibReadReq(SharedState *state, const uint8_t *body, size_t len) {
   if (len != 1)
     return;
-  // Stub: return zeroed payload for requested target
+
   WireCalibPayload payload = {};
   payload.target = body[0];
+
+  if (payload.target == 0) { // IMU
+    IMU::Calibration cal = state->calibration.imuData.read();
+    memcpy(payload.gyroOffset,  cal.gyro,  sizeof(cal.gyro));
+    memcpy(payload.accelOffset, cal.accel, sizeof(cal.accel));
+    memcpy(payload.magOffset,   cal.mag,   sizeof(cal.mag));
+  }
+
   sendPacket(MSG_CALIB_DATA, &payload, sizeof(payload));
 }
 
@@ -173,7 +189,8 @@ static void handleCalibReadReq(const uint8_t *body, size_t len) {
 // Packet dispatcher — called after CRC is verified
 // decoded[0] = type, decoded[1..n-3] = body, decoded[n-2..n-1] = CRC (consumed)
 // ---------------------------------------------------------------------------
-static void dispatch(SharedState *state, const uint8_t *decoded, size_t decLen,
+static void dispatch(SharedState *state,
+                     const uint8_t *decoded, size_t decLen,
                      uint32_t &lastDriveTime, uint32_t &lastPoseTime) {
   if (decLen < 3)
     return; // minimum: type(1) + crc(2)
@@ -197,28 +214,28 @@ static void dispatch(SharedState *state, const uint8_t *decoded, size_t decLen,
     handleStatusReq(state, bodyLen);
     break;
   case MSG_CALIB_WRITE:
-    handleCalibWrite(body, bodyLen);
+    handleCalibWrite(state, body, bodyLen);
     break;
   case MSG_CALIB_READ_REQ:
-    handleCalibReadReq(body, bodyLen);
+    handleCalibReadReq(state, body, bodyLen);
     break;
   default:
-    break; // unknown type — silent drop
+    break;
   }
 }
 
 // ---------------------------------------------------------------------------
 // Frame processing — COBS-decode, verify CRC, dispatch
 // ---------------------------------------------------------------------------
-static void processFrame(SharedState *state, const uint8_t *raw, size_t rawLen,
+static void processFrame(SharedState *state,
+                         const uint8_t *raw, size_t rawLen,
                          uint32_t &lastDriveTime, uint32_t &lastPoseTime) {
   static uint8_t decoded[kRxBufSize];
   size_t decLen = cobs_decode(raw, rawLen, decoded);
   if (decLen < 3)
     return;
   uint16_t expected = crc16(decoded, decLen - 2);
-  uint16_t received =
-      ((uint16_t)decoded[decLen - 2] << 8) | decoded[decLen - 1];
+  uint16_t received = ((uint16_t)decoded[decLen - 2] << 8) | decoded[decLen - 1];
   if (expected == received)
     dispatch(state, decoded, decLen, lastDriveTime, lastPoseTime);
 }
@@ -229,7 +246,7 @@ static void processFrame(SharedState *state, const uint8_t *raw, size_t rawLen,
 void commTaskInit(SharedState &state) { Serial.begin(kBaudRate); }
 
 void commTask(void *parameters) {
-  auto *state = static_cast<SharedState *>(parameters);
+  auto state = static_cast<SharedState *>(parameters);
 
   static uint8_t rxBuf[kRxBufSize];
   size_t rxLen = 0;

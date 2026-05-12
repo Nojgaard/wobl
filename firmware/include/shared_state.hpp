@@ -1,30 +1,9 @@
 #pragma once
+#include "protected.hpp"
+#include "calib_state.hpp"
 #include "imu.hpp"
 #include "wheel.hpp"
 #include "servo.hpp"
-
-template <typename T> class Protected {
-  T _val;
-  portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
-
-public:
-  void write(const T &v) {
-    taskENTER_CRITICAL(&_mux);
-    _val = v;
-    taskEXIT_CRITICAL(&_mux);
-  }
-  T read() {
-    taskENTER_CRITICAL(&_mux);
-    T tmp = _val;
-    taskEXIT_CRITICAL(&_mux);
-    return tmp;
-  }
-
-public:
-  Protected() = default;
-  Protected(const Protected &) = delete;
-  Protected &operator=(const Protected &) = delete;
-};
 
 struct IMUStatus {
   int status;
@@ -49,7 +28,7 @@ struct ServosData {
 };
 
 struct SensorState {
-  Protected<IMU::Data> imu;
+  Protected<IMU::Data>  imu;
   Protected<WheelsData> wheels;
   Protected<ServosData> servos;
 };
@@ -81,7 +60,8 @@ struct DeviceStatus {
 };
 
 struct SharedState {
-  DeviceStatus status;
-  SensorState telemetry;
+  DeviceStatus     status;
+  CalibState       calibration;
+  SensorState      telemetry;
   ActuatorCommands commands;
 };
