@@ -20,7 +20,7 @@ def policy(timestep):
         timestep.observation["robot/orientation"], scalar_first=True
     )
     equilibrium_pitch = 0.031
-    pitch = quat.as_euler("XYZ", degrees=False)[1] - equilibrium_pitch
+    pitch = quat.as_euler("xyz", degrees=False)[1] - equilibrium_pitch
     pitch_rate = timestep.observation["robot/angular_velocity"][1]
     joint_vel = np.mean(timestep.observation["robot/joint_velocities"][2:])
 

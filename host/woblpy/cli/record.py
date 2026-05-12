@@ -18,7 +18,7 @@ def on_imu(sample: zenoh.Sample):
     q = imu.orientation
     if np.linalg.norm([q.x, q.y, q.z, q.w]) == 0:
         return
-    rpy = R.from_quat([q.x, q.y, q.z, q.w]).as_euler("XYZ")
+    rpy = R.from_quat([q.x, q.y, q.z, q.w]).as_euler("xyz")
     roll, pitch, yaw = rpy
     rr.log("imu/euler/roll", rr.Scalars(roll))
     rr.log("imu/euler/pitch", rr.Scalars(pitch))

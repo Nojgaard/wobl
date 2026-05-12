@@ -40,8 +40,8 @@ class DriveTelemetry:
     timestamp_ms: int = 0
 
     def orientation_euler(self) -> tuple[float, float, float]:
-        """Return roll, pitch, yaw in radians from the quaternion."""
-        return R.from_quat(self.quat_xyzw).as_euler("XYZ")
+        """Return fixed-axis roll, pitch, yaw in radians from the quaternion."""
+        return R.from_quat(self.quat_xyzw).as_euler("xyz")
 
 
 @dataclass

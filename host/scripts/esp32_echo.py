@@ -63,10 +63,12 @@ def main() -> None:
             latencies.append(rtt_ms)
 
             if i % 10 == 0 or i == args.count - 1:
-                w, x, y, z = telem.quat_wxyz
+                x, y, z, w = telem.quat_xyzw
+                rpy = telem.orientation_euler()
                 print(
                     f"  [{i+1:4d}] RTT={rtt_ms:5.1f} ms  "
                     f"quat=({w:.3f}, {x:.3f}, {y:.3f}, {z:.3f})  "
+                    f"rpy=({rpy[0]:.1f}, {rpy[1]:.1f}, {rpy[2]:.1f})  "
                     f"lv={telem.left_vel:+.3f}  rv={telem.right_vel:+.3f}  "
                     f"t={telem.timestamp_ms} ms"
                 )

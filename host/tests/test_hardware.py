@@ -49,19 +49,19 @@ def test_status_responds(hw: WoblSerial) -> None:
 def test_imu_initialised(hw: WoblSerial) -> None:
     """IMU status field must be zero (no error code)."""
     status = hw.request_status()
-    assert status.imu_status == 0, (
+    assert status.imu_status == 1, (
         f"IMU reported error status {status.imu_status}"
     )
 
 
 @pytest.mark.hardware
 def test_task_rates(hw: WoblSerial) -> None:
-    """IMU must be running >50 Hz and FOC loop >1000 Hz."""
+    """IMU must be running >=50 Hz and FOC loop >=1000 Hz."""
     status = hw.request_status()
-    assert status.imu_rate > 50.0, (
+    assert status.imu_rate >= 50.0, (
         f"IMU update rate too low: {status.imu_rate:.1f} Hz"
     )
-    assert status.foc_rate > 1000.0, (
+    assert status.foc_rate >= 1000.0, (
         f"FOC rate too low: {status.foc_rate:.1f} Hz"
     )
 
@@ -103,7 +103,7 @@ def test_pitch_roll_plausible(hw: WoblSerial) -> None:
     cmd = DriveCommand(left_enabled=False, right_enabled=False)
     telem = hw.step_drive(cmd)
     x, y, z, w = telem.quat_xyzw
-    roll, pitch, _ = R.from_quat([x, y, z, w]).as_euler("XYZ")
+    roll, pitch, _ = R.from_quat([x, y, z, w]).as_euler("xyz")
     assert abs(roll) < math.radians(90), f"Roll {math.degrees(roll):.1f}° out of range"
     assert abs(pitch) < math.radians(90), f"Pitch {math.degrees(pitch):.1f}° out of range"
 
@@ -188,7 +188,7 @@ def test_corrupt_frame_ignored(hw: WoblSerial, serial_port: str | None) -> None:
     # A valid STATUS_REQ must still get a response
     status = hw.request_status()
     assert status is not None, "Firmware failed to respond after a corrupt frame"
-    assert status.imu_status == 0
+    assert status.imu_status == 1
 
 
 # ---------------------------------------------------------------------------

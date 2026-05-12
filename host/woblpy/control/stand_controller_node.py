@@ -12,7 +12,7 @@ def print_orientation(imu: Imu):
     if np.linalg.norm([q.x, q.y, q.z, q.w]) == 0:
         return
 
-    rpy = R.from_quat([q.x, q.y, q.z, q.w]).as_euler("XYZ")
+    rpy = R.from_quat([q.x, q.y, q.z, q.w]).as_euler("xyz")
     print(
         f"IMU Orientation - Roll: {rpy[0]:.3f}, Pitch: {rpy[1]:.3f}, Yaw: {rpy[2]:.3f}"
     )
