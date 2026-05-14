@@ -30,6 +30,8 @@ from woblpy.hardware.protocol import (
     PoseCommand,
     PoseTelemetry,
     StatusData,
+    WheelCalibPayload,
+    WheelTuningPayload,
 )
 
 # ---------------------------------------------------------------------------
@@ -45,6 +47,15 @@ _MSG_CALIB_WRITE = 0x07
 _MSG_CALIB_ACK = 0x08
 _MSG_CALIB_READ_REQ = 0x09
 _MSG_CALIB_DATA = 0x0A
+_MSG_WHEEL_CALIB_CMD = 0x0B
+_MSG_WHEEL_CALIB_READ_REQ = 0x0C
+_MSG_WHEEL_CALIB_DATA = 0x0D
+_MSG_WHEEL_TUNING_WRITE = 0x0E
+_MSG_WHEEL_TUNING_READ_REQ = 0x0F
+_MSG_WHEEL_TUNING_DATA = 0x10
+
+_WHEEL_TARGET_LEFT = 1
+_WHEEL_TARGET_RIGHT = 2
 
 # ---------------------------------------------------------------------------
 # Packed struct formats (little-endian, matches __attribute__((packed)) layout)
@@ -58,6 +69,10 @@ _FMT_POSE_TELEM = struct.Struct("<BB6f")      # valid_l, valid_r, lp, lv, le, rp
 _FMT_STATUS = struct.Struct("<ifffiiBB")      # imu_st, imu_hz, foc_hz, whl_hz, l_st, r_st, l_ok, r_ok
 _FMT_CALIB_PAYLOAD = struct.Struct("<B9i")    # target, gyr[3], acc[3], mag[3] — int32_t LSBs
 _FMT_CALIB_ACK = struct.Struct("<B")          # success
+_FMT_WHEEL_CALIB_CMD = struct.Struct("<B")    # target
+_FMT_WHEEL_CALIB_DATA = struct.Struct("<Bfi") # target, zero angle, sensor direction
+_FMT_WHEEL_TUNING_WRITE = struct.Struct("<B6fB") # target, p/i/d/tf/vel_limit/volt_limit, persist
+_FMT_WHEEL_TUNING_DATA = struct.Struct("<B6f") # target, p/i/d/tf/vel_limit/volt_limit
 
 # VIDs for common ESP32 USB-serial bridge chips
 _ESP32_VIDS = {
@@ -101,6 +116,8 @@ class WoblSerial:
             _MSG_STATUS: queue.SimpleQueue(),
             _MSG_CALIB_ACK: queue.SimpleQueue(),
             _MSG_CALIB_DATA: queue.SimpleQueue(),
+            _MSG_WHEEL_CALIB_DATA: queue.SimpleQueue(),
+            _MSG_WHEEL_TUNING_DATA: queue.SimpleQueue(),
         }
         self._tx_lock = threading.Lock()
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
@@ -265,6 +282,76 @@ class WoblSerial:
             gyro_offset=(gx, gy, gz),
             accel_offset=(ax, ay, az),
             mag_offset=(mx, my, mz),
+        )
+
+    def write_wheel_calibration(self, target: int) -> bool:
+        if target not in (_WHEEL_TARGET_LEFT, _WHEEL_TARGET_RIGHT):
+            raise ValueError("wheel target must be 1 (left) or 2 (right)")
+
+        body = _FMT_WHEEL_CALIB_CMD.pack(target)
+        self._send(_MSG_WHEEL_CALIB_CMD, body)
+        raw = self._recv(_MSG_CALIB_ACK)
+        (success,) = _FMT_CALIB_ACK.unpack(raw)
+        return bool(success)
+
+    def read_wheel_calibration(self, target: int) -> WheelCalibPayload:
+        if target not in (_WHEEL_TARGET_LEFT, _WHEEL_TARGET_RIGHT):
+            raise ValueError("wheel target must be 1 (left) or 2 (right)")
+
+        self._send(_MSG_WHEEL_CALIB_READ_REQ, bytes([target]))
+        raw = self._recv(_MSG_WHEEL_CALIB_DATA)
+        t, zero_electric_angle, sensor_direction = _FMT_WHEEL_CALIB_DATA.unpack(raw)
+        return WheelCalibPayload(
+            target=t,
+            zero_electric_angle=zero_electric_angle,
+            sensor_direction=sensor_direction,
+        )
+
+    def write_wheel_tuning(
+        self,
+        target: int,
+        *,
+        p: float,
+        i: float,
+        d: float,
+        lpf_velocity_tf: float,
+        velocity_limit: float,
+        voltage_limit: float,
+        persist: bool = False,
+    ) -> bool:
+        if target not in (_WHEEL_TARGET_LEFT, _WHEEL_TARGET_RIGHT):
+            raise ValueError("wheel target must be 1 (left) or 2 (right)")
+
+        body = _FMT_WHEEL_TUNING_WRITE.pack(
+            target,
+            p,
+            i,
+            d,
+            lpf_velocity_tf,
+            velocity_limit,
+            voltage_limit,
+            int(persist),
+        )
+        self._send(_MSG_WHEEL_TUNING_WRITE, body)
+        raw = self._recv(_MSG_CALIB_ACK)
+        (success,) = _FMT_CALIB_ACK.unpack(raw)
+        return bool(success)
+
+    def read_wheel_tuning(self, target: int) -> WheelTuningPayload:
+        if target not in (_WHEEL_TARGET_LEFT, _WHEEL_TARGET_RIGHT):
+            raise ValueError("wheel target must be 1 (left) or 2 (right)")
+
+        self._send(_MSG_WHEEL_TUNING_READ_REQ, bytes([target]))
+        raw = self._recv(_MSG_WHEEL_TUNING_DATA)
+        t, p, i, d, lpf_tf, velocity_limit, voltage_limit = _FMT_WHEEL_TUNING_DATA.unpack(raw)
+        return WheelTuningPayload(
+            target=t,
+            p=p,
+            i=i,
+            d=d,
+            lpf_velocity_tf=lpf_tf,
+            velocity_limit=velocity_limit,
+            voltage_limit=voltage_limit,
         )
 
     # ------------------------------------------------------------------

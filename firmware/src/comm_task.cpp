@@ -185,6 +185,111 @@ static void handleCalibReadReq(SharedState *state, const uint8_t *body, size_t l
   sendPacket(MSG_CALIB_DATA, &payload, sizeof(payload));
 }
 
+static bool isWheelTargetValid(uint8_t target) {
+  return target == WHEEL_TARGET_LEFT || target == WHEEL_TARGET_RIGHT;
+}
+
+static void handleWheelCalibCmd(SharedState *state, const uint8_t *body, size_t len) {
+  if (len != sizeof(WireWheelCalibCmd))
+    return;
+
+  WireWheelCalibCmd cmd;
+  memcpy(&cmd, body, sizeof(cmd));
+
+  uint8_t success = 0;
+  if (isWheelTargetValid(cmd.target)) {
+    CalibReq req;
+    req.pending = true;
+
+    if (cmd.target == WHEEL_TARGET_LEFT) {
+      state->calibration.leftWheelCalibReq.write(req);
+    } else {
+      state->calibration.rightWheelCalibReq.write(req);
+    }
+    success = 1;
+  }
+
+  WireCalibAck ack = {success};
+  sendPacket(MSG_CALIB_ACK, &ack, sizeof(ack));
+}
+
+static void handleWheelCalibReadReq(SharedState *state, const uint8_t *body, size_t len) {
+  if (len != 1)
+    return;
+
+  uint8_t target = body[0];
+  if (!isWheelTargetValid(target))
+    return;
+
+  Wheel::Calibration cal = (target == WHEEL_TARGET_LEFT)
+                               ? state->calibration.leftWheelCalibData.read()
+                               : state->calibration.rightWheelCalibData.read();
+
+  WireWheelCalibData payload{};
+  payload.target = target;
+  payload.zeroElectricAngle = cal.zero_electric_angle;
+  payload.sensorDirection = static_cast<int32_t>(cal.sensor_direction);
+  sendPacket(MSG_WHEEL_CALIB_DATA, &payload, sizeof(payload));
+}
+
+static void handleWheelTuningWrite(SharedState *state, const uint8_t *body, size_t len) {
+  if (len != sizeof(WireWheelTuning))
+    return;
+
+  WireWheelTuning msg;
+  memcpy(&msg, body, sizeof(msg));
+
+  uint8_t success = 0;
+  if (isWheelTargetValid(msg.target)) {
+    auto clamp = [](float v, float lo, float hi) -> float {
+      return v < lo ? lo : (v > hi ? hi : v);
+    };
+
+    WheelTuningReq req;
+    req.pending = true;
+    req.persist = msg.persist != 0;
+    req.tuning.p = clamp(msg.p, 0.0f, 20.0f);
+    req.tuning.i = clamp(msg.i, 0.0f, 50.0f);
+    req.tuning.d = clamp(msg.d, 0.0f, 5.0f);
+    req.tuning.lpf_velocity_tf = clamp(msg.lpfVelocityTf, 0.001f, 0.2f);
+    req.tuning.velocity_limit = clamp(msg.velocityLimit, 1.0f, 80.0f);
+    req.tuning.voltage_limit = clamp(msg.voltageLimit, 0.5f, 12.0f);
+
+    if (msg.target == WHEEL_TARGET_LEFT) {
+      state->calibration.leftWheelTuningReq.write(req);
+    } else {
+      state->calibration.rightWheelTuningReq.write(req);
+    }
+    success = 1;
+  }
+
+  WireCalibAck ack = {success};
+  sendPacket(MSG_CALIB_ACK, &ack, sizeof(ack));
+}
+
+static void handleWheelTuningReadReq(SharedState *state, const uint8_t *body, size_t len) {
+  if (len != 1)
+    return;
+
+  uint8_t target = body[0];
+  if (!isWheelTargetValid(target))
+    return;
+
+  Wheel::VelocityTuning tuning = (target == WHEEL_TARGET_LEFT)
+                                     ? state->calibration.leftWheelTuningData.read()
+                                     : state->calibration.rightWheelTuningData.read();
+
+  WireWheelTuningData payload{};
+  payload.target = target;
+  payload.p = tuning.p;
+  payload.i = tuning.i;
+  payload.d = tuning.d;
+  payload.lpfVelocityTf = tuning.lpf_velocity_tf;
+  payload.velocityLimit = tuning.velocity_limit;
+  payload.voltageLimit = tuning.voltage_limit;
+  sendPacket(MSG_WHEEL_TUNING_DATA, &payload, sizeof(payload));
+}
+
 // ---------------------------------------------------------------------------
 // Packet dispatcher — called after CRC is verified
 // decoded[0] = type, decoded[1..n-3] = body, decoded[n-2..n-1] = CRC (consumed)
@@ -218,6 +323,18 @@ static void dispatch(SharedState *state,
     break;
   case MSG_CALIB_READ_REQ:
     handleCalibReadReq(state, body, bodyLen);
+    break;
+  case MSG_WHEEL_CALIB_CMD:
+    handleWheelCalibCmd(state, body, bodyLen);
+    break;
+  case MSG_WHEEL_CALIB_READ_REQ:
+    handleWheelCalibReadReq(state, body, bodyLen);
+    break;
+  case MSG_WHEEL_TUNING_WRITE:
+    handleWheelTuningWrite(state, body, bodyLen);
+    break;
+  case MSG_WHEEL_TUNING_READ_REQ:
+    handleWheelTuningReadReq(state, body, bodyLen);
     break;
   default:
     break;

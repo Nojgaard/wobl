@@ -1,22 +1,43 @@
 #pragma once
 
 #include <SimpleFOC.h>
+#include <cstdint>
 
 class Wheel {
 public:
+    enum class Id : uint8_t {
+        Left = 1,
+        Right = 2,
+    };
+
     struct Calibration {
-        bool calibrated;
         float zero_electric_angle; // rad
-        Direction sensor_direction;
+        Direction sensor_direction = Direction::UNKNOWN;
+    };
+
+    struct VelocityTuning {
+        float p = 0.1f;
+        float i = 0.5f;
+        float d = 0.0f;
+        float lpf_velocity_tf = 0.01f;
+        float velocity_limit = 40.0f; // rad/s
+        float voltage_limit = 5.0f;   // V
+    };
+
+    enum class Status : uint8_t {
+        Uninitialized = 0,
+        Operational = 1,
+        ReadyForCalibration = 2,
+        MotorError = 3,
     };
 
     struct Config {
+        Id id;
         int polePairs;
         int pinA;
         int pinB;
         int pinC;
         int pinEnable;
-        Calibration calibration;
     };
 
     struct Data {
@@ -33,15 +54,25 @@ public:
     int init(float voltage_supply, float voltage_limit, TwoWire &wire);
     void update();
 
-    const Data &data();
+    const Data &data() const;
+    Calibration calibration() const;
+    VelocityTuning tuning() const;
     void command(bool enabled, float velocity);
+    void tune(const VelocityTuning &tuning, bool persist = false);
+    bool calibrate();
     bool isOk() const;
+    Status status() const;
 
 private:
-    bool _initOk = false;
+    bool loadCalibrationFromNvs();
+    bool saveCalibrationToNvs();
+    bool loadTuningFromNvs();
+    bool saveTuningToNvs();
+
+    Status _status = Status::Uninitialized;
     Data _data;
     Command _command;
-    Calibration _calibration;
+    Id _id;
 
     MagneticSensorI2C _sensor;
     BLDCDriver3PWM _driver;

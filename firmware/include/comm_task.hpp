@@ -18,6 +18,18 @@ enum MsgType : uint8_t {
     MSG_CALIB_ACK       = 0x08,
     MSG_CALIB_READ_REQ  = 0x09,
     MSG_CALIB_DATA      = 0x0A,
+
+    MSG_WHEEL_CALIB_CMD      = 0x0B,
+    MSG_WHEEL_CALIB_READ_REQ = 0x0C,
+    MSG_WHEEL_CALIB_DATA     = 0x0D,
+    MSG_WHEEL_TUNING_WRITE   = 0x0E,
+    MSG_WHEEL_TUNING_READ_REQ= 0x0F,
+    MSG_WHEEL_TUNING_DATA    = 0x10,
+};
+
+enum WheelTarget : uint8_t {
+    WHEEL_TARGET_LEFT  = 1,
+    WHEEL_TARGET_RIGHT = 2,
 };
 
 // ---------------------------------------------------------------------------
@@ -96,6 +108,41 @@ struct WireCalibPayload {
 // CALIB_ACK (0x08)
 struct WireCalibAck {
     uint8_t success;
+} __attribute__((packed));
+
+// WHEEL_CALIB_CMD (0x0B) — host → firmware
+struct WireWheelCalibCmd {
+    uint8_t target;   // WheelTarget
+} __attribute__((packed));
+
+// WHEEL_CALIB_DATA (0x0D) — firmware → host
+struct WireWheelCalibData {
+    uint8_t target;       // WheelTarget
+    float   zeroElectricAngle;
+    int32_t sensorDirection;
+} __attribute__((packed));
+
+// WHEEL_TUNING_WRITE (0x0E) — host → firmware
+struct WireWheelTuning {
+    uint8_t target;   // WheelTarget
+    float   p;
+    float   i;
+    float   d;
+    float   lpfVelocityTf;
+    float   velocityLimit;
+    float   voltageLimit;
+    uint8_t persist;  // 1: save to NVS
+} __attribute__((packed));
+
+// WHEEL_TUNING_DATA (0x10) — firmware → host
+struct WireWheelTuningData {
+    uint8_t target;   // WheelTarget
+    float   p;
+    float   i;
+    float   d;
+    float   lpfVelocityTf;
+    float   velocityLimit;
+    float   voltageLimit;
 } __attribute__((packed));
 
 // ---------------------------------------------------------------------------

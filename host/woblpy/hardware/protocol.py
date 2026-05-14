@@ -98,6 +98,28 @@ class CalibPayload:
     )
 
 
+@dataclass
+class WheelCalibPayload:
+    """Response payload for wheel calibration read operations."""
+
+    target: int = 0
+    zero_electric_angle: float = 0.0
+    sensor_direction: int = 0
+
+
+@dataclass
+class WheelTuningPayload:
+    """Response payload for wheel tuning read operations."""
+
+    target: int = 0
+    p: float = 0.1
+    i: float = 0.5
+    d: float = 0.0
+    lpf_velocity_tf: float = 0.01
+    velocity_limit: float = 40.0
+    voltage_limit: float = 5.0
+
+
 @runtime_checkable
 class Hardware(Protocol):
     """Protocol implemented by both WoblSerial and WoblSim."""
