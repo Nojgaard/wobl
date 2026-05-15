@@ -62,7 +62,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--wait-s",
         type=float,
-        default=0.3,
+        default=5.0,
         help="Seconds to wait before readback.",
     )
     return parser.parse_args()
@@ -102,6 +102,17 @@ def main() -> None:
     _header("WOBL Wheel Calibration")
     print("Connecting to ESP32...")
     hw = WoblSerial.open(port=args.port)
+
+    status = hw.request_status()
+    left_status = status.left_wheel_status
+    right_status = status.right_wheel_status
+
+    print(f"Left wheel status:  {left_status}")
+    print(f"Right wheel status: {right_status}")
+
+    if left_status != 1 or right_status != 1:
+        _warn("One or both wheels are not OK. Calibration may fail or be inaccurate.")
+        print("Make sure the robot is on a stable surface and both wheels can spin freely.")
 
     all_ok = True
     try:
