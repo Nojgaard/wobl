@@ -1,5 +1,5 @@
 #include "wheel.hpp"
-
+#include "debug.hpp"
 #include <Preferences.h>
 
 static constexpr const char *kNvsKeyZeroAngle = "cal_zea";
@@ -92,18 +92,20 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   // Probe the AS5600 before handing off to SimpleFOC.
   wire.beginTransmission(0x36);
   if (wire.endTransmission() != 0) {
-    return 0; // sensor not found on this bus
+    DPRINTF("[wheel] sensor not found on this bus\r\n");
+    return static_cast<int>(_status); // sensor not found on this bus
   }
 
   int status = 1;
   _sensor.init(&wire);
+
   _motor.linkSensor(&_sensor);
 
   _driver.voltage_power_supply = voltage_supply;
   _driver.voltage_limit = voltage_limit;
   status = _driver.init();
   if (status != 1) {
-    return status;
+    return static_cast<int>(_status); // driver failed to initialize
   }
 
   _motor.linkDriver(&_driver);
@@ -116,7 +118,7 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
 
   status = _motor.init();
   if (status != 1) {
-    return status;
+    return static_cast<int>(_status);
   }
 
   _status = Status::ReadyForCalibration;
@@ -124,14 +126,14 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   bool calibrated = loadCalibrationFromNvs();
 
   if (!calibrated)
-    return 0;
+    return static_cast<int>(_status);
 
   int foc = _motor.initFOC();
   if (foc == 1 && _motor.sensor_direction == Direction::UNKNOWN) {
     // Sensor responded but direction could not be determined — likely swapped
     // sensor/motor
     _status = Status::MotorError;
-    return 0;
+    return static_cast<int>(_status);
   }
   _status = (foc == 1) ? Status::Operational : Status::ReadyForCalibration;
   return foc;
@@ -221,6 +223,6 @@ void Wheel::update() {
   _motor.loopFOC();
   _motor.move(_command.velocity);
 
-  _data.angle = _motor.shaftAngle();
-  _data.velocity = _motor.shaftVelocity();
+  _data.angle = _motor.shaft_angle;
+  _data.velocity = _motor.shaft_velocity;
 }
