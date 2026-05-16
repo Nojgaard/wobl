@@ -20,11 +20,11 @@
 #include <freertos/task.h>
 
 static constexpr float kTestVelocity  = 1.0f;  // rad/s — safe bench speed
-static constexpr long  kRunMs         = 5000;   // ms per direction
+static constexpr long  kRunMs         = 10000;   // ms per direction
 static constexpr long  kSampleMs      = 200;    // ms between samples
-// Expected angle_delta at kTestVelocity over kRunMs: 1.0 * 5.0 = 5.0 rad.
+// Expected angle_delta at kTestVelocity over kRunMs: 1.0 * 10.0 = 10.0 rad.
 // Require at least 50% of that — generous to allow for PID undershoot.
-static constexpr float kMinAngleDelta = 2.5f;   // rad
+static constexpr float kMinAngleDelta = 5.0f;   // rad
 // Direction check: angle_delta sign must match command sign.
 // avg_vel is kept for diagnostics only — LPF lag makes it unreliable for PASS/FAIL.
 

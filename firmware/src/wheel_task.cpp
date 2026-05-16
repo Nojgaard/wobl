@@ -130,12 +130,11 @@ void wheelTask(void *parameters) {
   long lastFocTime = micros();
 
   for (;;) {
-    update(*state);
-
     long now = micros();
+
     status.focRate = 1000000.0f / (now - lastFocTime);
     lastFocTime = now;
 
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    update(*state);
   }
 }
