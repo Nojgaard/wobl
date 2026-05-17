@@ -23,6 +23,7 @@ void setup() {
   Serial.begin(115200);
 #endif
 
+  delay(50);
   wheelTaskInit(state);
   imuTaskInit(state);
   //servoTaskInit(state);

@@ -94,6 +94,15 @@ void wheelTaskInit(SharedState &state) {
 }
 
 static void update(SharedState &state) {
+  leftWheel.update();
+  rightWheel.update();
+
+  // Command + telemetry sync at 200 Hz
+  long now = millis();
+  if (now - lastUpdateTime < 5) {
+    return;
+  }
+
   serviceWheelCalibrationReq(leftWheel, state.calibration.leftWheelCalibReq,
                              state.calibration.leftWheelCalibData);
   serviceWheelCalibrationReq(rightWheel, state.calibration.rightWheelCalibReq,
@@ -104,14 +113,6 @@ static void update(SharedState &state) {
   serviceWheelTuningReq(rightWheel, state.calibration.rightWheelTuningReq,
                         state.calibration.rightWheelTuningData);
 
-  leftWheel.update();
-  rightWheel.update();
-
-  // Command + telemetry sync at 200 Hz
-  long now = millis();
-  if (now - lastUpdateTime < 5) {
-    return;
-  }
 
   WheelsCommand command = state.commands.wheels.read();
   leftWheel.command(command.left.enabled, command.left.velocity);
