@@ -74,8 +74,9 @@ void wheelTaskInit(SharedState &state) {
   SimpleFOCDebug::enable(&Serial);
 #endif
 
+  vTaskDelay(pdMS_TO_TICKS(200));
   status.leftStatus = leftWheel.init(kVoltageSupply, kVoltageLimit, wire0);
-  vTaskDelay(100 / portTICK_PERIOD_MS);
+  vTaskDelay(pdMS_TO_TICKS(10));
   status.rightStatus = rightWheel.init(kVoltageSupply, kVoltageLimit, wire1);
 
   DPRINTF("[wheels] left  init=%d ok=%d\r\n", status.leftStatus,

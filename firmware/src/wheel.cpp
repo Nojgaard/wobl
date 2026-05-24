@@ -89,7 +89,6 @@ bool Wheel::saveTuningToNvs() {
 int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   _status = Status::Uninitialized;
 
-  delay(50); // Wait for hardware to stabilize
   // Probe the AS5600 before handing off to SimpleFOC.
   wire.beginTransmission(0x36);
   if (wire.endTransmission() != 0) {

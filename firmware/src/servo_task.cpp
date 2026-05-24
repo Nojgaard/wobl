@@ -29,12 +29,17 @@ void servoTaskInit(SharedState &state) {
 
   bool leftOk = leftHip.init(bus);
   bool rightOk = rightHip.init(bus);
-  DPRINTF("Left hip init: %d", leftOk);
-  DPRINTF("Right hip init: %d", rightOk);
+  DPRINTF("Left hip init: %d\n", leftOk);
+  DPRINTF("Right hip init: %d\n", rightOk);
 
   lastCommandTime = millis();
   lastFeedbackTime = millis();
   state.status.servos.write({.leftOk = leftOk, .rightOk = rightOk});
+
+  state.commands.servos.write({
+      .left = {.enabled = false, .positionRad = leftHip.data().positionRad},
+      .right = {.enabled = false, .positionRad = rightHip.data().positionRad},
+  });
 }
 
 static void update(SharedState &state) {

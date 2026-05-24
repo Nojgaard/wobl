@@ -12,6 +12,7 @@ bool Servo::init(SMS_STS &bus) {
   if (_bus->Ping(_config.id) == -1)
     return false;
   _bus->EnableTorque(_config.id, false);
+  update();
   return true;
 }
 
