@@ -14,11 +14,17 @@ static IMUStatus imuStatus{ .status = 0, .updateRate = 0.0 };
 static IMU::Data data;
 
 void imuTaskInit(SharedState &state) {
-  SPI.begin();
+  bool spiSuccess = SPI.begin();
+  if (!spiSuccess) {
+    DPRINTLN("Failed to initialize SPI");
+    imuStatus.status = -1;
+    state.status.imu.write(imuStatus);
+    return;
+  }
+  
   imuStatus.status = imu.initialize(SPI, kCSPin);
   if (imuStatus.status != 1) {
     DPRINTF("Failed to initialize IMU: %d", imuStatus.status);
-    while (true) delay(1000);
   } else {
     DPRINTLN("IMU initialized successfully");
     auto cal = imu.load_biases();
@@ -29,6 +35,10 @@ void imuTaskInit(SharedState &state) {
 }
 
 static void update(SharedState &state) {
+  if (imuStatus.status != 1) {
+    return;
+  }
+
   CalibReq req = state.calibration.imuReq.read();
   if (req.pending) {
     state.calibration.imuReq.write(CalibReq{});

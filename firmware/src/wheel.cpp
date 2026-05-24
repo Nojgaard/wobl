@@ -89,6 +89,7 @@ bool Wheel::saveTuningToNvs() {
 int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   _status = Status::Uninitialized;
 
+  delay(50); // Wait for hardware to stabilize
   // Probe the AS5600 before handing off to SimpleFOC.
   wire.beginTransmission(0x36);
   if (wire.endTransmission() != 0) {
@@ -97,6 +98,7 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   }
 
   int status = 1;
+  _sensor.min_elapsed_time = 0.001f; // 1 ms = 1 kHz update rate
   _sensor.init(&wire);
 
   _motor.linkSensor(&_sensor);
@@ -112,6 +114,7 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
 
   _motor.controller = MotionControlType::velocity;
   _motor.voltage_sensor_align = 5.0f;
+  _motor.motion_downsample = 2; // Try to stabilize velocity estimation
   if (!loadTuningFromNvs()) {
     tune(VelocityTuning());
   }

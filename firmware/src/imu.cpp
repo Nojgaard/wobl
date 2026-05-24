@@ -1,25 +1,25 @@
-#include <imu.hpp>
 #include "debug.hpp"
+#include <imu.hpp>
 
 #include <Preferences.h>
 
 // NVS namespace — owned by the IMU module, not visible to comm_task.
 static constexpr const char *kNvsNamespace = "wobl_calib";
-static constexpr const char *kNvsKeyGyro   = "gyro";
-static constexpr const char *kNvsKeyAccel  = "accel";
-static constexpr const char *kNvsKeyMag    = "mag";
+static constexpr const char *kNvsKeyGyro = "gyro";
+static constexpr const char *kNvsKeyAccel = "accel";
+static constexpr const char *kNvsKeyMag = "mag";
 
 // Factory defaults applied when NVS is empty (first boot after flash).
 static const int32_t kDefaultBiasAccel[3] = {-330752, -826368, 585728};
-static const int32_t kDefaultBiasGyro[3]  = {-17440,    1344,  12768};
-static const int32_t kDefaultBiasMag[3]   = {-230400, 2479070, -3262980};
+static const int32_t kDefaultBiasGyro[3] = {-17440, 1344, 12768};
+static const int32_t kDefaultBiasMag[3] = {-230400, 2479070, -3262980};
 
 IMU::IMU() {}
 
 bool IMU::initialize(SPIClass &spi, uint8_t csPin) {
   bool success = true;
 
-  success &= (icm_.begin(csPin, spi) == ICM_20948_Stat_Ok);
+  success &= (icm_.begin(csPin, spi, 1000000UL) == ICM_20948_Stat_Ok);
   delay(50);
 
   auto check = [&](ICM_20948_Status_e ret, const char *name) {
@@ -40,19 +40,24 @@ bool IMU::initialize(SPIClass &spi, uint8_t csPin) {
   ICM_20948_smplrt_t smplrt;
   smplrt.g = 4;
   smplrt.a = 4;
-  check(icm_.setSampleRate((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr), smplrt), "setSampleRate");
+  check(icm_.setSampleRate((ICM_20948_Internal_Acc | ICM_20948_Internal_Gyr),
+                           smplrt),
+        "setSampleRate");
   check(icm_.setGyroSF(4, 3), "setGyroSF"); // divider=4, 2000dps
   const unsigned char accelOnlyGain[4] = {0x00, 0xE8, 0xBA, 0x2E}; // 225Hz
-  check(icm_.writeDMPmems(ACCEL_ONLY_GAIN, 4, &accelOnlyGain[0]), "ACCEL_ONLY_GAIN");
+  check(icm_.writeDMPmems(ACCEL_ONLY_GAIN, 4, &accelOnlyGain[0]),
+        "ACCEL_ONLY_GAIN");
   const unsigned char accelAlphaVar[4] = {0x3D, 0x27, 0xD2, 0x7D}; // 225Hz
-  check(icm_.writeDMPmems(ACCEL_ALPHA_VAR, 4, &accelAlphaVar[0]), "ACCEL_ALPHA_VAR");
-  const unsigned char accelAVar[4]     = {0x02, 0xD8, 0x2D, 0x83}; // 225Hz
+  check(icm_.writeDMPmems(ACCEL_ALPHA_VAR, 4, &accelAlphaVar[0]),
+        "ACCEL_ALPHA_VAR");
+  const unsigned char accelAVar[4] = {0x02, 0xD8, 0x2D, 0x83}; // 225Hz
   check(icm_.writeDMPmems(ACCEL_A_VAR, 4, &accelAVar[0]), "ACCEL_A_VAR");
 
   // Use Quat9 (9-axis orientation vector, includes magnetometer). Yaw drift is
   // acceptable for a self-balancing robot, and Quat9 is not rate-limited by
   // the magnetometer ODR (68.75Hz) that caps Quat9 at ~56Hz.
-  check(icm_.enableDMPSensor(INV_ICM20948_SENSOR_ORIENTATION), "enableDMPSensor");
+  check(icm_.enableDMPSensor(INV_ICM20948_SENSOR_ORIENTATION),
+        "enableDMPSensor");
   check(icm_.setDMPODRrate(DMP_ODR_Reg_Quat9, 0), "setDMPODRrate");
   check(icm_.enableFIFO(), "enableFIFO");
   check(icm_.enableDMP(), "enableDMP");
@@ -69,11 +74,16 @@ bool IMU::try_read(IMU::Data &out_data) {
   constexpr float gyro_scale =
       (M_PI / 180.0f) / 2048.0f; // dps2000: rad/s per LSB
 
+  constexpr uint8_t kMaxDrain = 10; // Avoid draining the FIFO too much in one
+                                    // go, to give the DMP a chance to refill it
+  uint8_t drain_count = 0;
+
   bool got_data = false;
   icm_.readDMPdataFromFIFO(&data_dmp_);
 
-  while ((icm_.status == ICM_20948_Stat_Ok) ||
-         (icm_.status == ICM_20948_Stat_FIFOMoreDataAvail)) {
+  while (drain_count++ < kMaxDrain &&
+         ((icm_.status == ICM_20948_Stat_Ok) ||
+          (icm_.status == ICM_20948_Stat_FIFOMoreDataAvail))) {
     if (data_dmp_.header & DMP_header_bitmap_Quat9) {
       float q1 = data_dmp_.Quat9.Data.Q1 * quat9_scale;
       float q2 = data_dmp_.Quat9.Data.Q2 * quat9_scale;
@@ -101,6 +111,12 @@ bool IMU::try_read(IMU::Data &out_data) {
       out_data.gyr[2] = gyro.Z * gyro_scale;
     }
     icm_.readDMPdataFromFIFO(&data_dmp_);
+  }
+
+  if (drain_count >= kMaxDrain) {
+    DPRINTLN("Warning: IMU FIFO overflow, resetting FIFO");
+    icm_.resetFIFO();
+    got_data = false; // discard data if we had to reset the FIFO
   }
 
   return got_data;
@@ -140,8 +156,8 @@ void IMU::print_biases() {
   IMU::Calibration cal = get_dmp_biases();
   DPRINTLN("Current biases:");
   DPRINTF("  Accel: [%d, %d, %d]\n", cal.accel[0], cal.accel[1], cal.accel[2]);
-  DPRINTF("  Gyro:  [%d, %d, %d]\n", cal.gyro[0],  cal.gyro[1],  cal.gyro[2]);
-  DPRINTF("  Mag:   [%d, %d, %d]\n", cal.mag[0],   cal.mag[1],   cal.mag[2]);
+  DPRINTF("  Gyro:  [%d, %d, %d]\n", cal.gyro[0], cal.gyro[1], cal.gyro[2]);
+  DPRINTF("  Mag:   [%d, %d, %d]\n", cal.mag[0], cal.mag[1], cal.mag[2]);
 }
 
 IMU::Calibration IMU::save_biases() {
@@ -149,9 +165,9 @@ IMU::Calibration IMU::save_biases() {
 
   Preferences prefs;
   prefs.begin(kNvsNamespace, false);
-  prefs.putBytes(kNvsKeyGyro,  cal.gyro,  sizeof(cal.gyro));
+  prefs.putBytes(kNvsKeyGyro, cal.gyro, sizeof(cal.gyro));
   prefs.putBytes(kNvsKeyAccel, cal.accel, sizeof(cal.accel));
-  prefs.putBytes(kNvsKeyMag,   cal.mag,   sizeof(cal.mag));
+  prefs.putBytes(kNvsKeyMag, cal.mag, sizeof(cal.mag));
   prefs.end();
 
   return cal;
@@ -159,16 +175,16 @@ IMU::Calibration IMU::save_biases() {
 
 IMU::Calibration IMU::load_biases() {
   IMU::Calibration cal = {
-    .gyro  = {kDefaultBiasGyro[0],  kDefaultBiasGyro[1],  kDefaultBiasGyro[2]},
-    .accel = {kDefaultBiasAccel[0], kDefaultBiasAccel[1], kDefaultBiasAccel[2]},
-    .mag   = {kDefaultBiasMag[0],   kDefaultBiasMag[1],   kDefaultBiasMag[2]}
-  };
+      .gyro = {kDefaultBiasGyro[0], kDefaultBiasGyro[1], kDefaultBiasGyro[2]},
+      .accel = {kDefaultBiasAccel[0], kDefaultBiasAccel[1],
+                kDefaultBiasAccel[2]},
+      .mag = {kDefaultBiasMag[0], kDefaultBiasMag[1], kDefaultBiasMag[2]}};
 
   Preferences prefs;
   if (prefs.begin(kNvsNamespace, true)) { // read-only
-    prefs.getBytes(kNvsKeyGyro,  cal.gyro,  sizeof(cal.gyro));
+    prefs.getBytes(kNvsKeyGyro, cal.gyro, sizeof(cal.gyro));
     prefs.getBytes(kNvsKeyAccel, cal.accel, sizeof(cal.accel));
-    prefs.getBytes(kNvsKeyMag,   cal.mag,   sizeof(cal.mag));
+    prefs.getBytes(kNvsKeyMag, cal.mag, sizeof(cal.mag));
     prefs.end();
     DPRINTLN("IMU biases loaded from NVS");
   } else {
