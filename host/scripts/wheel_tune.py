@@ -7,6 +7,7 @@ Commands
   set <param> <value>     — apply a parameter immediately (unpersisted)
   zero                    — zero all PID gains/LPF Tf (safe tuning start point)
   drive <velocity>        — spin both wheels at <velocity> rad/s, stream telemetry
+  bench                   — run the hardcoded benchmark sequence (~24 s)
   stop                    — halt the wheels
   save                    — persist current values to NVS
   load                    — reload tuning from firmware NVS
@@ -77,6 +78,7 @@ class _DriveThread(threading.Thread):
         target: str,
         rerun_enabled: bool,
         log_path: str | None = None,
+        t_epoch: float = 0.0,
     ) -> None:
         super().__init__(daemon=True)
         self._hw = hw
@@ -85,6 +87,7 @@ class _DriveThread(threading.Thread):
         self._stop_event = threading.Event()
         self._rerun_enabled = rerun_enabled
         self._log_path = log_path
+        self._t_epoch = t_epoch
         self._samples: list[dict] = []
 
     def stop(self) -> None:
@@ -94,9 +97,6 @@ class _DriveThread(threading.Thread):
         _rr: Any = None
         if self._rerun_enabled:
             import rerun as _rr  # type: ignore
-            _rr.log("wheel/velocity/target", _rr.SeriesLines(names="Target", colors=[200, 200, 200]))
-            _rr.log("wheel/velocity/left",   _rr.SeriesLines(names="Left",   colors=[0, 180, 255]))
-            _rr.log("wheel/velocity/right",  _rr.SeriesLines(names="Right",  colors=[255, 140, 0]))
 
         left_en  = self._target in ("left",  "both")
         right_en = self._target in ("right", "both")
@@ -109,8 +109,7 @@ class _DriveThread(threading.Thread):
             left_enabled=False, left_velocity=0.0,
             right_enabled=False, right_velocity=0.0,
         )
-        t0 = time.perf_counter()
-        next_tick = t0
+        next_tick = time.perf_counter()
 
         try:
             while not self._stop_event.is_set():
@@ -120,7 +119,7 @@ class _DriveThread(threading.Thread):
                     next_tick = time.perf_counter() + _DRIVE_PERIOD
                     continue
 
-                t_s = time.perf_counter() - t0
+                t_s = time.perf_counter() - self._t_epoch
                 lv, rv = telem.left_vel, telem.right_vel
                 angle = telem.left_angle if left_en else telem.right_angle
                 self._samples.append({
@@ -133,11 +132,11 @@ class _DriveThread(threading.Thread):
                 })
 
                 if left_en and right_en:
-                    line = f"\r  L: {lv:+7.3f}  R: {rv:+7.3f}  target: {v:+7.3f} rad/s    "
+                    line = f"\r\033[2K  L: {lv:+7.3f}  R: {rv:+7.3f}  target: {v:+7.3f} rad/s"
                 elif left_en:
-                    line = f"\r  L: {lv:+7.3f} A: {angle:+7.3f} target: {v:+7.3f} rad/s    "
+                    line = f"\r\033[2K  L: {lv:+7.3f} A: {angle:+7.3f} target: {v:+7.3f} rad/s"
                 else:
-                    line = f"\r  R: {rv:+7.3f}  target: {v:+7.3f} rad/s    "
+                    line = f"\r\033[2K  R: {rv:+7.3f}  target: {v:+7.3f} rad/s"
                 sys.stdout.write(line)
                 sys.stdout.flush()
 
@@ -188,6 +187,176 @@ class _DriveThread(threading.Thread):
 
 
 # ---------------------------------------------------------------------------
+# Bench sequence
+# ---------------------------------------------------------------------------
+
+# (velocity_rad_s, duration_s, label)
+_BENCH_SEQUENCE: list[tuple[float, float, str]] = [
+    (0.0,  1.5,  "idle"),
+    (3.0,  3.0,  "fwd"),
+    (0.0,  0.5,  "settle"),
+    (-3.0, 3.0,  "rev"),
+    (0.0,  0.5,  "settle"),
+    (5.0,  3.0,  "fwd_fast"),
+    (0.0,  0.5,  "settle"),
+    (-5.0, 3.0,  "rev_fast"),
+    (0.0,  1.0,  "settle"),
+    # rapid switching ±3 rad/s, 0.35 s per step
+    (3.0,  0.35, "rapid+"), (-3.0, 0.35, "rapid-"),
+    (3.0,  0.35, "rapid+"), (-3.0, 0.35, "rapid-"),
+    (3.0,  0.35, "rapid+"), (-3.0, 0.35, "rapid-"),
+    (3.0,  0.35, "rapid+"), (-3.0, 0.35, "rapid-"),
+    (0.0,  1.0,  "done"),
+]
+
+
+class _BenchThread(threading.Thread):
+    """Background thread: runs the hardcoded benchmark sequence and streams
+    telemetry to the terminal (and optionally to a Rerun viewer)."""
+
+    def __init__(
+        self,
+        hw: WoblSerial,
+        target: str,
+        rerun_enabled: bool,
+        log_path: str | None = None,
+        t_epoch: float = 0.0,
+    ) -> None:
+        super().__init__(daemon=True)
+        self._hw = hw
+        self._target = target  # "left", "right", or "both"
+        self._stop_event = threading.Event()
+        self._rerun_enabled = rerun_enabled
+        self._log_path = log_path
+        self._t_epoch = t_epoch
+        self._samples: list[dict] = []
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    def run(self) -> None:
+        _rr: Any = None
+        if self._rerun_enabled:
+            import rerun as _rr  # type: ignore
+
+        left_en  = self._target in ("left",  "both")
+        right_en = self._target in ("right", "both")
+
+        stop_cmd = DriveCommand(
+            left_enabled=False, left_velocity=0.0,
+            right_enabled=False, right_velocity=0.0,
+        )
+
+        try:
+            for v, duration, label in _BENCH_SEQUENCE:
+                if self._stop_event.is_set():
+                    break
+                drive_cmd = DriveCommand(
+                    left_enabled=left_en,   left_velocity=v  if left_en  else 0.0,
+                    right_enabled=right_en, right_velocity=v if right_en else 0.0,
+                )
+                step_start = time.perf_counter()
+                next_tick  = step_start
+
+                while not self._stop_event.is_set():
+                    try:
+                        telem = self._hw.step_drive(drive_cmd)
+                    except TimeoutError:
+                        next_tick = time.perf_counter() + _DRIVE_PERIOD
+                        continue
+
+                    t_s = time.perf_counter() - self._t_epoch
+                    lv, rv = telem.left_vel, telem.right_vel
+                    self._samples.append({
+                        "t_s":         t_s,
+                        "left_vel":    lv,
+                        "right_vel":   rv,
+                        "left_angle":  telem.left_angle,
+                        "right_angle": telem.right_angle,
+                        "target":      v,
+                        "step":        label,
+                    })
+
+                    if left_en and right_en:
+                        line = (
+                            f"\r\033[2K  [{label:<8}]  "
+                            f"L: {lv:+7.3f}  R: {rv:+7.3f}  target: {v:+7.3f} rad/s"
+                        )
+                    elif left_en:
+                        line = (
+                            f"\r\033[2K  [{label:<8}]  "
+                            f"L: {lv:+7.3f}  target: {v:+7.3f} rad/s"
+                        )
+                    else:
+                        line = (
+                            f"\r\033[2K  [{label:<8}]  "
+                            f"R: {rv:+7.3f}  target: {v:+7.3f} rad/s"
+                        )
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+
+                    if _rr is not None:
+                        _rr.set_time("t_s", duration=t_s)
+                        _rr.log("wheel/velocity/target", _rr.Scalars(v))
+                        _rr.log("wheel/velocity/left",   _rr.Scalars(lv))
+                        _rr.log("wheel/velocity/right",  _rr.Scalars(rv))
+
+                    next_tick += _DRIVE_PERIOD
+                    sleep_for = next_tick - time.perf_counter()
+                    if sleep_for > 0:
+                        time.sleep(sleep_for)
+
+                    if time.perf_counter() - step_start >= duration:
+                        break
+        finally:
+            try:
+                self._hw.step_drive(stop_cmd)
+            except Exception:
+                pass
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            if self._log_path and self._samples:
+                self._write_csv()
+
+    def _write_csv(self) -> None:
+        path = Path(self._log_path)  # type: ignore[arg-type]
+        fields = list(self._samples[0].keys())
+        with path.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            w.writerows(self._samples)
+        print(f"{CYAN}  Logged {len(self._samples)} samples → {path}{RESET}")
+
+    def print_stats(self) -> None:
+        """Print per-step velocity statistics for the completed benchmark."""
+        if not self._samples:
+            return
+        # Collect samples per step label, preserving sequence order
+        steps: dict[str, list[dict]] = {}
+        for s in self._samples:
+            steps.setdefault(s["step"], []).append(s)
+        print(f"\n  {'Step':<10} {'Wheel':<6} {'mean':>8} {'std':>7} {'min':>8} {'max':>8}  n")
+        print(f"  {'─'*10} {'─'*6} {'─'*8} {'─'*7} {'─'*8} {'─'*8}  {'─'*4}")
+        seen: set[str] = set()
+        for s in self._samples:
+            label = s["step"]
+            if label in seen:
+                continue
+            seen.add(label)
+            for wheel, key in (("Left", "left_vel"), ("Right", "right_vel")):
+                vals = [x[key] for x in steps[label]]
+                n    = len(vals)
+                mean = sum(vals) / n
+                std  = math.sqrt(sum((x - mean) ** 2 for x in vals) / n)
+                print(
+                    f"  {label:<10} {wheel:<6} "
+                    f"{mean:>+8.3f} {std:>7.3f} "
+                    f"{min(vals):>+8.3f} {max(vals):>+8.3f}  {n}"
+                )
+        print()
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -230,8 +399,9 @@ class WheelTuneCLI(cmd.Cmd):
         self._rerun = rerun_enabled
         self._log_path = log_path
         self._rerun_initialized = False
+        self._t_epoch: float = 0.0
         self._state = WheelTuningPayload()
-        self._drive_thread: _DriveThread | None = None
+        self._drive_thread: _DriveThread | _BenchThread | None = None
 
     @property
     def _is_driving(self) -> bool:
@@ -244,7 +414,7 @@ class WheelTuneCLI(cmd.Cmd):
     def preloop(self) -> None:
         _header("WOBL Wheel Tuning REPL")
         print(f"  {CYAN}Params:{RESET}   p  i  d  tf  vel_lim  volt_lim")
-        print(f"  {CYAN}Commands:{RESET} show  set  zero  wheel  drive  stop  save  load  quit\n")
+        print(f"  {CYAN}Commands:{RESET} show  set  zero  wheel  drive  bench  stop  save  load  quit\n")
         try:
             self._state = self._hw.read_wheel_tuning(WHEEL_LEFT)
             print(f"{GREEN}✓ Initial tuning loaded from firmware.{RESET}")
@@ -316,9 +486,29 @@ class WheelTuneCLI(cmd.Cmd):
         self._drive_thread = _DriveThread(
             self._hw, v, target=self._drive_target,
             rerun_enabled=self._rerun, log_path=self._log_path,
+            t_epoch=self._t_epoch,
         )
         self._drive_thread.start()
         print(f"{GREEN}Driving {self._drive_target} at {v:.2f} rad/s — type 'stop' to halt{RESET}")
+
+    def do_bench(self, _arg: str) -> None:
+        """Run the hardcoded benchmark velocity sequence (~22 s) and stream telemetry."""
+        if self._is_driving:
+            print(f"{YELLOW}Already driving. Use 'stop' first.{RESET}")
+            return
+        if self._rerun:
+            self._ensure_rerun()
+        self._drive_thread = _BenchThread(
+            self._hw, target=self._drive_target,
+            rerun_enabled=self._rerun, log_path=self._log_path,
+            t_epoch=self._t_epoch,
+        )
+        self._drive_thread.start()
+        total = sum(d for _, d, _ in _BENCH_SEQUENCE)
+        print(
+            f"{GREEN}Benchmark started on {self._drive_target} "
+            f"({total:.1f} s) — type 'stop' to abort early{RESET}"
+        )
 
     def do_zero(self, _arg: str) -> None:
         """Zero all PID gains — safe starting point for tuning."""
@@ -393,6 +583,10 @@ class WheelTuneCLI(cmd.Cmd):
             return
         import rerun as rr  # type: ignore
         rr.init("wheel_tune", spawn=True)
+        self._t_epoch = time.perf_counter()
+        rr.log("wheel/velocity/target", rr.SeriesLines(names="Target", colors=[200, 200, 200]))
+        rr.log("wheel/velocity/left",   rr.SeriesLines(names="Left",   colors=[0, 180, 255]))
+        rr.log("wheel/velocity/right",  rr.SeriesLines(names="Right",  colors=[255, 140, 0]))
         self._rerun_initialized = True
 
 

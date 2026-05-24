@@ -91,7 +91,7 @@ class RobotWorld(Task):
         self.robot.observables.joint_positions.enabled = True
         self.robot.observables.joint_velocities.enabled = True
         self.robot.observables.joint_velocities.corruptor = noises.Multiplicative(
-            distributions.LogNormal(sigma=0.03)
+            distributions.LogNormal(sigma=0.25)
         )
         self.robot.observables.joint_velocities.delay = 1
         self.robot.observables.joint_efforts.enabled = True

@@ -17,6 +17,7 @@ class Controller:
         self.offset_pitch = 0.0313
         # self.offset_pitch = 0.04
         self.last_time = time.monotonic()
+        self._last_telem_ms: int | None = None  # firmware timestamp of previous telemetry packet
 
         self.roll = 0.0
         self.pitch = 0.0
@@ -27,7 +28,8 @@ class Controller:
         # self.pitch_rate = KalmanFilter(0.1, 0.02)
 
         self.yaw_rate = LinearFilter(0.5, 0.0)
-        self.fwd_velocity = KalmanFilter(0.001, 0.02)
+        # q=1.0, r=0.25 matches plot_bench.py defaults (validated on bench data)
+        self.fwd_velocity = KalmanFilter(1.0, 0.25)
         # self.fwd_velocity = LinearFilter(0.2, 0.0)
 
         self.cmd_fwd_velocity = LinearFilter(0.2, 0.0)
@@ -54,7 +56,13 @@ class Controller:
         fwd_velocity, yaw_rate = self.diff_drive.forward_kinematics(
             telem.left_vel, telem.right_vel
         )
-        self.fwd_velocity.update(fwd_velocity)
+        prev_ms, self._last_telem_ms = self._last_telem_ms, telem.timestamp_ms
+        dt_ms = (telem.timestamp_ms - prev_ms) if prev_ms is not None else 20
+        telem_dt = dt_ms / 1000.0 if 0 < dt_ms <= 500 else 0.02
+        # No tau/target here: in balance mode the firmware runs torque control,
+        # so velocity is not closed-loop driven toward a target (unlike wheel_tune
+        # where the velocity PID makes tau≈20ms valid for plot_bench.py).
+        self.fwd_velocity.update(fwd_velocity, dt=telem_dt)
         self.yaw_rate.update(yaw_rate)
 
     def update_dt(self):
