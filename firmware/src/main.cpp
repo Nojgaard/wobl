@@ -23,10 +23,10 @@ void setup() {
   Serial.begin(115200);
 #endif
 
-  delay(200);
+  delay(300);
   wheelTaskInit(state);
-  imuTaskInit(state);
   servoTaskInit(state);
+  imuTaskInit(state);
 
   xTaskCreatePinnedToCore(wheelTask, "foc",   4096, &state, 24, NULL, 1);
   xTaskCreatePinnedToCore(imuTask,   "imu",   4096, &state, 10, NULL, 0);

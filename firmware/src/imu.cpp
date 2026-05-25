@@ -74,7 +74,7 @@ bool IMU::try_read(IMU::Data &out_data) {
   constexpr float gyro_scale =
       (M_PI / 180.0f) / 2048.0f; // dps2000: rad/s per LSB
 
-  constexpr uint8_t kMaxDrain = 10; // Avoid draining the FIFO too much in one
+  constexpr uint8_t kMaxDrain = 30; // Avoid draining the FIFO too much in one
                                     // go, to give the DMP a chance to refill it
   uint8_t drain_count = 0;
 
