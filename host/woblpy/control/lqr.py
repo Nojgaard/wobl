@@ -3,58 +3,95 @@ import numpy as np
 
 
 def compute_lqr_gains():
-    """Compute LQR gains for a self-balancing two-wheeled robot.
+    """Compute LQR gains for a self-balancing, two-wheeled biped robot.
 
-    Returns:
-        K: Gain vector [k_pitch, k_pitch_rate, k_position, k_velocity]
+    This function calculates the LQR controller gains for a simplified
+    inverted-pendulum model of the robot, using its physical parameters.
     """
-    # Physical parameters
-    # m_body, m_wheel = 2.3909, 0.25  # Body and wheel mass (kg)
-    m_body, m_wheel = 2.0, 0.20  # Body and wheel mass (kg)
-    # com_height, r = 0.09779, 0.039  # CoM height and wheel radius (m)
-    com_height, r = 0.11, 0.039  # CoM height and wheel radius (m)
-    g = 9.80665  # Gravity (m/s²)
 
-    # Moments of inertia
-    I_body = m_body * com_height**2
-    I_wheel = 0.5 * m_wheel * r**2
-    m_total = m_body + m_wheel
-
-    # Effective inertias
-    I_eff = I_body + m_body * com_height**2  # Total body rotational inertia
-    m_eff = m_total + I_wheel / r**2  # Effective mass including wheel inertia
-
-    # Coupled dynamics denominator
-    denom = I_eff * m_eff - (m_body * com_height) ** 2
-
-    # State space: x = [θ, θ̇, x_pos, ẋ], u = τ (wheel torque)
+    # ---- System Dynamics Parameters ----
+    mass = 2.3909  # Mass of the robot (kg)
+    com_length = 0.09779  # Height of the center of mass (m)
+    gravity = 9.80665  # Acceleration due to gravity (m/s^2)
+    # torque_constant = 0.37  # Motor torque constant (Nm/A)
+    kt = 0.0002133174682914169  # Nm per (rad/s) friction coefficient
+    # ---- Continuous-Time State-Space Model ----
+    #
+    # We approximate the robot as a single inverted pendulum on wheels.
+    #
+    # State vector x = [θ, θ̇, v]
+    #   θ   : Body pitch angle (rad)
+    #   θ̇  : Body angular velocity (rad/s)
+    #   v   : Robot linear velocity (m/s)
+    #
+    # Input u = Wheel torque (Nm)
+    #
+    # The A matrix describes how the state evolves with no input:
     A = np.array(
         [
-            [0, 1, 0, 0],
-            [m_body * g * com_height * m_eff / denom, 0, 0, 0],
-            [0, 0, 0, 1],
-            [m_body**2 * g * com_height**2 / denom, 0, 0, 0],
+            [0, 1, 0],  # d(θ)/dt = θ̇
+            [gravity / com_length, 0, 0],  # d(θ̇)/dt ∝ gravity and CoM height
+            [-gravity / mass, 0, 0],  # d(v)/dt affected by body angle
         ]
     )
 
-    B = np.array([[0], [-m_eff / (r * denom)], [0], [I_eff / (r * denom)]])
+    # The B matrix describes how the input torque affects the system.
+    #
+    # It captures how wheel torque influences:
+    #   - Angular acceleration of the body
+    #   - Linear acceleration of the robot
+    B = np.array(
+        [
+            [0],  # Torque does not directly influence θ
+            [-1 / (mass * (com_length**2))],  # Torque creates angular acceleration
+            [1 / mass],  # Torque creates linear acceleration
+        ]
+    )
 
-    # LQR cost matrices
+    # ---- LQR Cost Matrices ----
+    #
+    # Q penalizes deviation of states — it defines what we care about regulating.
+    # Higher weights = stronger correction.
+    #
+    # We penalize:
+    #   θ (body inclination): Keep the robot upright
+    #   θ̇ (angular speed): Smooth motion
+    #   v (forward speed): Don't accelerate too quickly
+    #
     Q = np.diag(
         [
-            50.0,  # θ - pitch angle (critical!)
-            25.0,  # θ̇ - angular velocity
-            1.0,  # x_pos - position (for integral action)
-            10.0,  # ẋ - linear velocity
+            3.0,  # θ      (most important: avoid falling)
+            0.2,  #  θ̇      (reduce fast tipping)
+            1.5,  #  v      (light penalty to discourage runaway speed)
+            1.0,  # Integral of v (to eliminate steady-state error)
         ]
     )
 
-    R = np.array([[0.7]])  # Torque effort (in Nm²)
+    # R penalizes the control effort (wheel torque).
+    # Larger R → less aggressive control (reduced torque usage).
+    R = np.array([[1.5]])
 
-    K, _, _ = control.lqr(A, B, Q, R)
+    # ---- Integral Action ----
+    #
+    # Optional: integrate a specific state to eliminate steady-state error.
+    # Here, we integrate robot velocity (v) to track a desired forward speed.
+    #
+    # C_integral defines which combination of states to integrate.
+    # In this case:  integrate 'v'
+    C_integral = np.array([[0, 0, 1.0]])  # Integrate the velocity state
+
+    # ---- Compute the LQR Gains ----
+    #
+    # The controller will produce:
+    #       u = -Kx
+    # Where K contains the gains applied to each state.
+    #
+    K, _, _ = control.lqr(A, B, Q, R, integral_action=C_integral)
+
     return K[0]
 
 
 if __name__ == "__main__":
     K = compute_lqr_gains()
-    print(f"LQR Gains: {K}")
+    print("Computed LQR Gains:")
+    print(K)
