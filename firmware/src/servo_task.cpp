@@ -65,6 +65,14 @@ static void update(SharedState &state) {
         .right = {rd.valid, rd.positionRad, rd.velocityRps, rd.effortPct},
     });
     lastFeedbackTime = now;
+
+    if (state.calibration.servosCalibReq.read().pending) {
+      state.calibration.servosCalibReq.write(CalibReq{});
+      bool leftCalib = leftHip.calibrate();
+      bool rightCalib = rightHip.calibrate();
+      DPRINTF("Left hip calib: %d\n", leftCalib);
+      DPRINTF("Right hip calib: %d\n", rightCalib);
+    }
   }
 }
 

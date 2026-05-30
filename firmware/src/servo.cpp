@@ -56,6 +56,13 @@ void Servo::update() {
   _data.effortPct = _bus->ReadLoad(-1) * 0.1f;
 }
 
+bool Servo::calibrate() {
+  if (!data().valid)
+    return false;
+
+  return _bus->CalibrationOfs(_config.id) == _config.id;
+}
+
 int Servo::radiansToSteps(float radians) const {
   return static_cast<int>(radians * STEPS_PER_REVOLUTION / (2.0f * M_PI));
 }
