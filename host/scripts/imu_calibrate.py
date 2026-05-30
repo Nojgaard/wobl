@@ -22,11 +22,13 @@ import argparse
 import math
 import sys
 import time
+from datetime import datetime
 
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent))
 
 from woblpy.hardware.protocol import CalibPayload, DriveCommand, DriveTelemetry
 from woblpy.hardware.wobl_serial import WoblSerial
+from woblpy.record import Recorder
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -79,7 +81,7 @@ def _pitch_roll_deg(telem: DriveTelemetry) -> tuple[float, float]:
 # Phases
 # ---------------------------------------------------------------------------
 
-def phase_gyro(hw: WoblSerial, duration: float = 20.0) -> None:
+def phase_gyro(hw: WoblSerial, duration: float = 20.0, *, rec: Recorder | None = None) -> None:
     """Phase 1: gyro bias — keep robot flat and stationary."""
     _header("Phase 1 / 5 — Gyro bias")
     print("Place the robot flat on a level surface and do NOT move it.")
@@ -87,9 +89,14 @@ def phase_gyro(hw: WoblSerial, duration: float = 20.0) -> None:
 
     print(f"\nCalibrating for {duration:.0f} s — do not move the robot…\n")
     deadline = time.monotonic() + duration
+    t0_ms: int | None = None
     while time.monotonic() < deadline:
         remaining = deadline - time.monotonic()
         telem = hw.step_drive(DriveCommand())
+        if t0_ms is None:
+            t0_ms = telem.timestamp_ms
+        t_s = (telem.timestamp_ms - t0_ms) / 1000.0
+        gx, gy, gz = telem.gyro
         gmag = _gyro_mag(telem)
         bar_len = max(0, int(remaining / duration * 30))
         bar = "█" * bar_len + "░" * (30 - bar_len)
@@ -98,11 +105,21 @@ def phase_gyro(hw: WoblSerial, duration: float = 20.0) -> None:
             end="",
             flush=True,
         )
+        if rec is not None:
+            rec.log_many(
+                {
+                    "imu/gyro/x": gx,
+                    "imu/gyro/y": gy,
+                    "imu/gyro/z": gz,
+                    "imu/gyro/magnitude": gmag,
+                },
+                t_s,
+            )
     print()
     _ok("Gyro phase complete")
 
 
-def phase_accel(hw: WoblSerial, hold_s: float = 5.0) -> None:
+def phase_accel(hw: WoblSerial, hold_s: float = 5.0, *, rec: Recorder | None = None) -> None:
     """Phase 2: accelerometer bias — 6-point tumble."""
     _header("Phase 2 / 5 — Accelerometer bias (6-point tumble)")
     orientations = [
@@ -120,16 +137,24 @@ def phase_accel(hw: WoblSerial, hold_s: float = 5.0) -> None:
 
     for i, (desc, axis) in enumerate(orientations, 1):
         _prompt(f"[{i}/6] {desc} ({axis})")
+        if rec is not None:
+            rec.log_text("imu/phase", f"{desc} ({axis})")
         deadline = time.monotonic() + hold_s
+        t0_ms: int | None = None
         while time.monotonic() < deadline:
             remaining = deadline - time.monotonic()
             telem = hw.step_drive(DriveCommand())
+            if t0_ms is None:
+                t0_ms = telem.timestamp_ms
+            t_s = (telem.timestamp_ms - t0_ms) / 1000.0
             pitch, roll = _pitch_roll_deg(telem)
             print(
                 f"\r  Holding… {remaining:4.1f}s  pitch={pitch:+6.1f}°  roll={roll:+6.1f}°  ",
                 end="",
                 flush=True,
             )
+            if rec is not None:
+                rec.log_many({"imu/attitude/pitch": pitch, "imu/attitude/roll": roll}, t_s)
         print()
     _ok("Accelerometer phase complete")
 
@@ -243,30 +268,63 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip phases 1–3 (gyro/accel/mag motion) and go straight to read+save.",
     )
+    parser.add_argument(
+        "--rerun",
+        action="store_true",
+        help="Enable live Rerun visualisation.",
+    )
+    parser.add_argument(
+        "--rrd",
+        metavar="FILE",
+        default=None,
+        help=(
+            "Save recording to FILE (.rrd). "
+            "Auto-generates data/imu_calib_YYYYMMDD_HHMMSS.rrd when --rerun is given."
+        ),
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
 
+    save_path: str | None = args.rrd
+    if save_path is None and args.rerun:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = f"data/imu_calib_{ts}.rrd"
+
     print(f"{BOLD}WOBL IMU Calibration{RESET}")
     print("Connecting to ESP32…")
-    hw = WoblSerial(port=args.port)
-    print(f"Connected on {hw._ser.port}")  # type: ignore[attr-defined]
-
     try:
-        if not args.skip_motion:
-            phase_gyro(hw)
-            phase_accel(hw)
-            phase_mag(hw)
+        hw = WoblSerial.open(args.port)
+    except RuntimeError as exc:
+        _err(str(exc))
+        sys.exit(1)
+    print(f"Connected on {hw._serial.port}")
 
-        phase_read(hw)
-        phase_save(hw)
+    with Recorder("imu_calibrate", live=args.rerun, save_path=save_path) as rec:
+        rec.configure_series("imu/gyro/x",         name="Gyro X",   color=(255, 80,  80))
+        rec.configure_series("imu/gyro/y",         name="Gyro Y",   color=(80,  255, 80))
+        rec.configure_series("imu/gyro/z",         name="Gyro Z",   color=(80,  80,  255))
+        rec.configure_series("imu/gyro/magnitude", name="Gyro |ω|", color=(200, 200, 200))
+        rec.configure_series("imu/attitude/pitch", name="Pitch",    color=(255, 160,  0))
+        rec.configure_series("imu/attitude/roll",  name="Roll",     color=(0,   200, 255))
 
-    except KeyboardInterrupt:
-        print(f"\n{YELLOW}Interrupted — calibration not saved.{RESET}")
-    finally:
-        hw.close()
+        try:
+            phase_read(hw)
+            if not args.skip_motion:
+                phase_gyro(hw, rec=rec)
+                phase_accel(hw, rec=rec)
+                phase_mag(hw)
+
+            phase_read(hw)
+            #if not args.skip_motion:
+                #phase_save(hw)
+
+        except KeyboardInterrupt:
+            print(f"\n{YELLOW}Interrupted — calibration not saved.{RESET}")
+        finally:
+            hw.close()
 
     _header("Calibration complete")
     print("Biases are now stored in NVS and will be loaded automatically on boot.\n")
