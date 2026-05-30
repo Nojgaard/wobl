@@ -28,6 +28,7 @@ public:
   void update();
   const Data &data() const;
   void command(const Command &cmd);
+  bool calibrate();
 
 private:
   int radiansToSteps(float radians) const;

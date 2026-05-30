@@ -19,6 +19,8 @@ struct CalibState {
   Protected<IMU::Calibration> imuData;
   Protected<CalibReq>         imuReq;
 
+  Protected<CalibReq> servosCalibReq;
+
   Protected<Wheel::Calibration> leftWheelCalibData;
   Protected<Wheel::Calibration> rightWheelCalibData;
   Protected<CalibReq>           leftWheelCalibReq;
