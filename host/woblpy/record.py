@@ -35,6 +35,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from woblpy.control.controller import Controller
+from woblpy.hardware.protocol import DriveCommand, DriveTelemetry
+
 
 class Recorder:
     """Wraps Rerun for scalar logging, optional live viewing, and .rrd saving."""
@@ -57,6 +60,19 @@ class Recorder:
 
         self._rr = rr
         rr.init(app_id, spawn=live)
+
+        self.configure_series("imu/gyro/x",         name="Gyro X",   color=(255, 80,  80))
+        self.configure_series("imu/gyro/y",         name="Gyro Y",   color=(80,  255, 80))
+        self.configure_series("imu/attitude/pitch", name="Pitch",    color=(255, 160,  0))
+        self.configure_series("imu/attitude/roll",  name="Roll",     color=(0,   200, 255))
+
+        self.configure_series("wheel/cmd/left/velocity",  name="Left Wheel Cmd Vel",  color=(255, 80,  255))
+        self.configure_series("wheel/cmd/right/velocity", name="Right Wheel Cmd Vel", color=(255, 80,  255))
+        self.configure_series("wheel/telem/left/velocity",  name="Left Wheel Velocity",  color=(80,  80,  255))
+        self.configure_series("wheel/telem/right/velocity", name="Right Wheel Velocity", color=(255, 200, 0))
+
+        self.configure_series("controller/fwd_velocity", name="Controller Fwd Vel", color=(255, 160, 0))
+        self.configure_series("controller/fwd_velocity_raw", name="Controller Fwd Vel Raw", color=(255, 160, 100))
 
     # ------------------------------------------------------------------
     # Configuration helpers
@@ -81,6 +97,24 @@ class Recorder:
     # ------------------------------------------------------------------
     # Logging
     # ------------------------------------------------------------------
+
+    def log_controller(self, telem: DriveTelemetry, cmd: DriveCommand, controller: Controller) -> None:
+        """Convenience method to log controller-relevant telemetry and commands."""
+        self.log_many(
+            {
+                "imu/gyro/x": controller.pitch_rate.value,
+                "imu/gyro/y": controller.yaw_rate.value,
+                "imu/attitude/pitch": controller.pitch,
+                "imu/attitude/roll": controller.roll,
+                "wheel/cmd/left/velocity": cmd.left_velocity,
+                "wheel/cmd/right/velocity": cmd.right_velocity,
+                "wheel/telem/left/velocity": telem.left_vel,
+                "wheel/telem/right/velocity": telem.right_vel,
+                "controller/fwd_velocity": controller.fwd_velocity.value,
+                "controller/fwd_velocity_raw": controller.fwd_velocity_raw,
+            },
+            t_s=telem.timestamp_ms / 1000.0,
+        )
 
     def log(self, entity: str, value: float, t_s: float) -> None:
         """Log a single scalar at timestamp ``t_s`` (seconds)."""
@@ -114,6 +148,7 @@ class Recorder:
             self._rr.save(str(self._save_path))
             print(f"  Saved recording → {self._save_path}")
             self._save_path = None  # prevent double-save
+            print("  Recording closed.")
 
     def __enter__(self) -> Recorder:
         return self

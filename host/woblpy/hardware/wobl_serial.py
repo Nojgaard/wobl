@@ -23,16 +23,10 @@ import serial
 import serial.tools.list_ports
 
 from woblpy.hardware import cobs
-from woblpy.hardware.protocol import (
-    CalibPayload,
-    DriveCommand,
-    DriveTelemetry,
-    PoseCommand,
-    PoseTelemetry,
-    StatusData,
-    WheelCalibPayload,
-    WheelTuningPayload,
-)
+from woblpy.hardware.protocol import (CalibPayload, DriveCommand,
+                                      DriveTelemetry, PoseCommand,
+                                      PoseTelemetry, StatusData,
+                                      WheelCalibPayload, WheelTuningPayload)
 
 # ---------------------------------------------------------------------------
 # Message type IDs (mirrors MsgType enum in comm_task.hpp)
@@ -120,6 +114,7 @@ class WoblSerial:
             _MSG_WHEEL_TUNING_DATA: queue.SimpleQueue(),
         }
         self._tx_lock = threading.Lock()
+        self._serial.reset_input_buffer()
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
 

@@ -25,13 +25,9 @@ import time
 from typing import Callable, Optional
 
 from woblpy.control.controller import Controller
-from woblpy.hardware.protocol import (
-    DriveCommand,
-    DriveTelemetry,
-    Hardware,
-    PoseCommand,
-    PoseTelemetry,
-)
+from woblpy.hardware.protocol import (DriveCommand, DriveTelemetry, Hardware,
+                                      PoseCommand, PoseTelemetry)
+from woblpy.record import Recorder
 
 
 class ControllerLoop:
@@ -43,11 +39,13 @@ class ControllerLoop:
         on_state: Optional[
             Callable[[DriveTelemetry, DriveCommand, PoseTelemetry], None]
         ] = None,
+        recorder: Optional[Recorder] = None,
     ) -> None:
         self._hardware = hardware
         self._drive_period = 1.0 / drive_hz
         self._pose_every_n = max(1, round(drive_hz / pose_hz))
         self._on_state = on_state
+        self._recorder = recorder
 
         self._controller = Controller()
         self._drive_cmd = DriveCommand()
@@ -88,14 +86,22 @@ class ControllerLoop:
             drive_telem = self._hardware.step_drive(self._drive_cmd)
             self._controller.update_drive_telem(drive_telem)
             self._drive_cmd = self._controller.update()
+            self._drive_cmd.left_enabled = True
+            self._drive_cmd.right_enabled = True
 
             # --- Pose tick (every N-th iteration) ---
             if tick % self._pose_every_n == 0:
+                print(f"Tick {tick}: pitch={self._controller.pitch:.3f} rad  pitch_rate={self._controller.pitch_rate.value:.3f} rad/s  velocity={self._controller.fwd_velocity.value:.3f} m/s")
+                print(f"           drive_cmd: left_vel={self._drive_cmd.left_velocity:.3f} rad/s  right_vel={self._drive_cmd.right_velocity:.3f} rad/s")
+                self.set_pose(0.1, 0.1)
                 self._latest_pose_telem = self._hardware.step_pose(self._pose_cmd)
 
             if self._on_state is not None:
                 self._on_state(drive_telem, self._drive_cmd, self._latest_pose_telem)
 
+            if self._recorder is not None:
+                self._recorder.log_controller(drive_telem, self._drive_cmd, self._controller)
+                
             tick += 1
             next_time += self._drive_period
             sleep_time = next_time - time.monotonic()

@@ -56,15 +56,27 @@ bool IMU::initialize(SPIClass &spi, uint8_t csPin) {
   // Use Quat9 (9-axis orientation vector, includes magnetometer). Yaw drift is
   // acceptable for a self-balancing robot, and Quat9 is not rate-limited by
   // the magnetometer ODR (68.75Hz) that caps Quat9 at ~56Hz.
-  check(icm_.enableDMPSensor(INV_ICM20948_SENSOR_ORIENTATION),
-        "enableDMPSensor");
+  check(icm_.enableDMPSensor(INV_ICM20948_SENSOR_ORIENTATION), "enableDMPSensor");
   check(icm_.setDMPODRrate(DMP_ODR_Reg_Quat9, 0), "setDMPODRrate");
+
+  check(icm_.enableDMPSensor(INV_ICM20948_SENSOR_GYROSCOPE), "enableDMPSensor");
+  check(icm_.setDMPODRrate(DMP_ODR_Reg_Gyro_Calibr, 0), "setDMPODRrate");
+
   check(icm_.enableFIFO(), "enableFIFO");
   check(icm_.enableDMP(), "enableDMP");
   check(icm_.resetDMP(), "resetDMP");
   check(icm_.resetFIFO(), "resetFIFO");
 
   return success;
+}
+
+void transformToReferenceFrame(IMU::Data &data) {
+  // Normalize axes: hardware (+X back, +Y left) → sim (+X forward, +Y right)
+  data.gyr[0] = -data.gyr[0];
+  data.gyr[1] = -data.gyr[1];
+
+  data.orientation[0] = -data.orientation[0];
+  data.orientation[1] = -data.orientation[1];
 }
 
 bool IMU::try_read(IMU::Data &out_data) {
@@ -119,6 +131,9 @@ bool IMU::try_read(IMU::Data &out_data) {
     got_data = false; // discard data if we had to reset the FIFO
   }
 
+  if (got_data) {
+    transformToReferenceFrame(out_data);
+  }
   return got_data;
 }
 
@@ -181,7 +196,7 @@ IMU::Calibration IMU::load_biases() {
       .mag = {kDefaultBiasMag[0], kDefaultBiasMag[1], kDefaultBiasMag[2]}};
 
   Preferences prefs;
-  if (prefs.begin(kNvsNamespace, true)) { // read-only
+  if (false && prefs.begin(kNvsNamespace, true)) { // read-only
     prefs.getBytes(kNvsKeyGyro, cal.gyro, sizeof(cal.gyro));
     prefs.getBytes(kNvsKeyAccel, cal.accel, sizeof(cal.accel));
     prefs.getBytes(kNvsKeyMag, cal.mag, sizeof(cal.mag));

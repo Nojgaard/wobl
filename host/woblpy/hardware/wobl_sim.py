@@ -19,18 +19,14 @@ resolution and the noise model in the original sim_node.py.
 from __future__ import annotations
 
 import threading
+import time
 from typing import Optional
 
 import numpy as np
 from dm_env import TimeStep
 
-from woblpy.hardware.protocol import (
-    DriveCommand,
-    DriveTelemetry,
-    PoseCommand,
-    PoseTelemetry,
-    StatusData,
-)
+from woblpy.hardware.protocol import (DriveCommand, DriveTelemetry,
+                                      PoseCommand, PoseTelemetry, StatusData)
 from woblpy.sim.application import Application
 from woblpy.sim.robot import Robot, RobotWorld
 
@@ -85,7 +81,7 @@ class WoblSim:
             left_vel=left_vel,
             right_angle=float(joint_pos[3]),
             right_vel=right_vel,
-            timestamp_ms=0,
+            timestamp_ms=(int)(time.time() * 1000.0),
         )
         pose_telem = PoseTelemetry(
             left_valid=True,

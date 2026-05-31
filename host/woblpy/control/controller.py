@@ -12,7 +12,8 @@ class Controller:
         # self._k = np.array([-7.70647133, -0.87846039, 2.61800094, 1.41421356])
         self._k = compute_lqr_gains()
         self.integral_error = 0.0
-        self.offset_pitch = 0.0313
+        #self.offset_pitch = 0.0313
+        self.offset_pitch = 0.1
         # self.offset_pitch = 0.04
         self._dt: float = 0.01  # seconds; set each tick from telemetry timestamps
         self._last_telem_ms: int | None = None  # firmware timestamp of previous telemetry packet
@@ -22,12 +23,13 @@ class Controller:
         self.yaw = 0.0
 
         self.roll_rate = LinearFilter(0.5, 0.0)
-        self.pitch_rate = LinearFilter(0.5, 0.0)
+        self.pitch_rate = LinearFilter(1.0, 0.0)
         # self.pitch_rate = KalmanFilter(0.1, 0.02)
 
         self.yaw_rate = LinearFilter(0.5, 0.0)
         # q=1.0, r=0.25 matches plot_bench.py defaults (validated on bench data)
-        self.fwd_velocity = KalmanFilter(1.0, 0.25)
+        self.fwd_velocity = KalmanFilter(2.0, 0.25)
+        self.fwd_velocity_raw = 0.0  # for logging/debugging only; not used in control
         #self.fwd_velocity = LinearFilter(0.05, 0.0)
 
         self.cmd_fwd_velocity = LinearFilter(0.2, 0.0)
@@ -58,6 +60,7 @@ class Controller:
         dt_ms = (telem.timestamp_ms - prev_ms) if prev_ms is not None else 20
         self._dt = dt_ms / 1000.0 if 0 < dt_ms <= 500 else 0.01
         self.fwd_velocity.update(fwd_velocity, dt=self._dt)
+        self.fwd_velocity_raw = fwd_velocity
         self.yaw_rate.update(yaw_rate)
 
     def update(self) -> DriveCommand:

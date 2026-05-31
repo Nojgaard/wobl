@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -26,9 +27,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from woblpy.control.kalman_filter import KalmanFilter
 
 _DEFAULT_CSV = Path(__file__).parent.parent / "bench.csv"
-_Q_DEFAULT = 1.0    # process noise — tune upward for faster response
+_Q_DEFAULT = 2.0    # process noise — tune upward for faster response
 _R_DEFAULT = 0.25   # measurement noise ≈ variance of encoder noise (σ≈0.54 rad/s on bench data)
-_TAU_DEFAULT = 0.02  # plant time constant in seconds. Measured 63%-rise time of ~20 ms on bench data.
+#_TAU_DEFAULT = 0.02  # plant time constant in seconds. Measured 63%-rise time of ~20 ms on bench data.
+_TAU_DEFAULT = None
 
 def _apply_kalman(
     series: pd.Series, t: pd.Series, q: float, r: float,
@@ -73,6 +75,8 @@ def main() -> None:
     df["left_smooth"]  = _apply_kalman(df["left_vel"],  df["t_s"], args.q, args.r, target_col, args.tau)
     df["right_smooth"] = _apply_kalman(df["right_vel"], df["t_s"], args.q, args.r, target_col, args.tau)
 
+    _print_summary(df)
+
     fig, axes = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
 
     _plot_wheel(axes[0], df, vel_col="left_vel",  smooth_col="left_smooth",
@@ -85,6 +89,72 @@ def main() -> None:
     fig.suptitle(f"Wheel velocity \u2014 {csv_path.name}  (q={args.q}, r={args.r}{tau_str})", fontsize=13)
     fig.tight_layout()
     plt.show()
+
+
+def _print_summary(df: pd.DataFrame) -> None:
+    """Print a short noise-and-lag summary to stdout."""
+    print("\n\u2500\u2500 Telemetry summary " + "\u2500" * 44)
+    cols = [
+        ("Left",  "left_vel",  "left_smooth"),
+        ("Right", "right_vel", "right_smooth"),
+    ]
+    t = df["t_s"].to_numpy(dtype=float)
+    has_target = "target" in df.columns
+    target = df["target"].to_numpy(dtype=float) if has_target else None
+
+    def compute_noise_and_lag(signal: np.ndarray, t: np.ndarray, target: np.ndarray | None) -> tuple[float, str, float]:
+        if target is None:
+            return float('nan'), "N/A (no target)", 0.0
+        # Lag: 63%-rise time across every step transition
+        lag_ms: list[float] = []
+        transitions = np.flatnonzero(np.diff(target) != 0)
+        for idx in transitions:
+            v_start   = signal[idx]
+            v_end     = target[idx + 1]
+            step_size = v_end - v_start
+            if abs(step_size) < 0.05:
+                continue
+            threshold = v_start + 0.63 * step_size
+            end = int(np.searchsorted(t, t[idx] + 2.0))
+            window_s = signal[idx + 1 : end]
+            window_t = t[idx + 1 : end]
+            if step_size > 0:
+                cross = np.flatnonzero(window_s >= threshold)
+            else:
+                cross = np.flatnonzero(window_s <= threshold)
+            if cross.size:
+                lag_ms.append((window_t[cross[0]] - t[idx]) * 1000.0)
+        if lag_ms:
+            mean_lag = float(np.mean(lag_ms))
+            std_lag  = float(np.std(lag_ms))
+            lag_str  = f"{mean_lag:5.1f} \u00b1 {std_lag:.1f} ms  (n={len(lag_ms)})"
+        else:
+            mean_lag = 0.0
+            lag_str  = "N/A (no step transitions found)"
+        # Noise: std dev of residuals (lag-compensated signal − target)
+        # Shift signal by mean lag (in seconds) using interpolation
+        lag_s = mean_lag / 1000.0
+        t_shifted = t - lag_s
+        # Interpolate signal to shifted time base
+        signal_shifted = np.interp(t, t_shifted, signal, left=np.nan, right=np.nan)
+        # Only compare where both are valid
+        valid = ~np.isnan(signal_shifted)
+        noise_std = float(np.std(signal_shifted[valid] - target[valid]))
+        return noise_std, lag_str, mean_lag
+
+    for label, vel_col, smooth_col in cols:
+        measured  = df[vel_col].to_numpy(dtype=float)
+        smoothed  = df[smooth_col].to_numpy(dtype=float)
+
+        # Measured velocity vs target
+        noise_meas, lag_meas, lag_val_meas = compute_noise_and_lag(measured, t, target)
+        # Smoothed velocity vs target
+        noise_smooth, lag_smooth, lag_val_smooth = compute_noise_and_lag(smoothed, t, target)
+
+        print(f"  {label:5s}  measured: noise \u03c3 = {noise_meas:.4f} rad/s    63%-rise lag = {lag_meas}")
+        print(f"         smoothed: noise \u03c3 = {noise_smooth:.4f} rad/s    63%-rise lag = {lag_smooth}")
+
+    print("\u2500" * 63 + "\n")
 
 
 def _plot_wheel(

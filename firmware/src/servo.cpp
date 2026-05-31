@@ -11,6 +11,7 @@ bool Servo::init(SMS_STS &bus) {
   _bus = &bus;
   if (_bus->Ping(_config.id) == -1)
     return false;
+  _bus->writeByte(_config.id, SMS_STS_MODE, 0); // position control mode	
   _bus->EnableTorque(_config.id, false);
   update();
   return true;

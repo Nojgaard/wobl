@@ -101,7 +101,7 @@ def phase_gyro(hw: WoblSerial, duration: float = 20.0, *, rec: Recorder | None =
         bar_len = max(0, int(remaining / duration * 30))
         bar = "█" * bar_len + "░" * (30 - bar_len)
         print(
-            f"\r  [{bar}] {remaining:5.1f}s  |gyro|={gmag:.4f} rad/s  ",
+            f"\r  [{bar}] {remaining:5.1f}s |gyro|={gmag:.4f} rad/s  ",
             end="",
             flush=True,
         )

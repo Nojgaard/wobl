@@ -10,7 +10,7 @@ def compute_lqr_gains():
     """
 
     # ---- System Dynamics Parameters ----
-    mass = 2.3909  # Mass of the robot (kg)
+    mass = 1.2  # Mass of the robot (kg)
     com_length = 0.09779  # Height of the center of mass (m)
     gravity = 9.80665  # Acceleration due to gravity (m/s^2)
     # torque_constant = 0.37  # Motor torque constant (Nm/A)
@@ -69,7 +69,7 @@ def compute_lqr_gains():
 
     # R penalizes the control effort (wheel torque).
     # Larger R → less aggressive control (reduced torque usage).
-    R = np.array([[1.5]])
+    R = np.array([[5.0]])
 
     # ---- Integral Action ----
     #
