@@ -25,6 +25,7 @@ def main() -> None:
 
     print(f"Opening serial port {'(auto-detect)' if args.port is None else args.port} …")
     with WoblSerial.open(args.port) as hw:
+        hw.wait_until_ready()
         print("Connected.  Sending status requests…\n")
         for i in range(args.count):
             t0 = time.monotonic()

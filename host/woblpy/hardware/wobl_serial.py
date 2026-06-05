@@ -17,6 +17,7 @@ from __future__ import annotations
 import queue
 import struct
 import threading
+import time
 from typing import Optional
 
 import serial
@@ -348,6 +349,26 @@ class WoblSerial:
             velocity_limit=velocity_limit,
             voltage_limit=voltage_limit,
         )
+    
+    def wait_until_ready(
+        self,
+        *,
+        timeout: float = 20.0,
+        interval: float = 0.2,
+    ) -> StatusData:
+        deadline = time.monotonic() + timeout
+        last_error: TimeoutError | None = None
+
+        while True:
+            try:
+                return self.request_status()
+            except TimeoutError as exc:
+                last_error = exc
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        f"ESP32 did not become ready within {timeout}s"
+                    ) from last_error
+                time.sleep(interval)
 
     # ------------------------------------------------------------------
     # Lifecycle

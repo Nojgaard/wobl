@@ -21,6 +21,9 @@ void setup() {
 
 #ifdef DEBUG
   Serial.begin(115200);
+#else
+  commTaskInit(state);
+  xTaskCreatePinnedToCore(commTask, "comm", 4096, &state, 10, NULL, 0);
 #endif
 
   delay(300);
@@ -32,10 +35,6 @@ void setup() {
   xTaskCreatePinnedToCore(imuTask,   "imu",   4096, &state, 10, NULL, 0);
   xTaskCreatePinnedToCore(servoTask, "servo", 4096, &state, 10, NULL, 0);
 
-#ifndef DEBUG
-  commTaskInit(state);
-  xTaskCreatePinnedToCore(commTask, "comm", 4096, &state, 10, NULL, 0);
-#endif
 }
 
 void loop() { vTaskDelete(NULL); }
