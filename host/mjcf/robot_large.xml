@@ -5,7 +5,7 @@
         <geom type="mesh" />
         <joint damping="0.02" armature="0.05" frictionloss="0.01" axis="1 0 0" />
         <default class="foot_collider">
-            <geom type="cylinder" quat="0.7071 0 0.7071 0" size="0.04 0.018" rgba="1 0 0 0.5"
+            <geom type="cylinder" quat="0.7071 0 0.7071 0" size="0.04 0.018" rgba="1 0 0 0"
                 contype="1" conaffinity="1" />
         </default>
         <default class="mirror">
@@ -13,96 +13,90 @@
         </default>
     </default>
     <asset>
-        <mesh name="bat_cap" file="Back Battery Cap.stl" />
-        <mesh name="bat_main" file="Battery Holder.stl" />
+        <mesh name="back_cap" file="Back Battery Cap.stl" />
         <mesh name="back" file="Back.stl" />
         <mesh name="battery" file="Battery.stl" />
         <mesh name="mounting_plate" file="Mounting Plate.stl" />
         <mesh name="shell" file="Shell.stl" />
-        <mesh name="rocker_switch" file="Rocker Switch.stl" />
 
         <mesh name="R_hip" file="Servo Leg Housing Assembly.stl" />
-        <mesh name="R_hip_servo" file="ServoHip.stl" />
+        <mesh name="R_hip_servo" file="Servo Leg Housing Servo.stl" />
         <mesh name="R_thigh" file="Upper Leg Asembly.stl" />
         <mesh name="R_shin" file="Lower Leg.stl" />
-        <mesh name="R_shin_servo" file="GM3506 v2.stl" />
-        <mesh name="R_wheel_adapter" file="WheelAdapter.stl" />
+        <mesh name="R_shin_servo" file="Lower Servo.stl" />
         <mesh name="R_link" file="Leg Link Assembly.stl" />
         <mesh name="R_foot" file="Wheel.stl" />
 
         <mesh name="L_hip" file="Servo Leg Housing Assembly.stl" class="mirror" />
-        <mesh name="L_hip_servo" file="ServoHip.stl" class="mirror" />
+        <mesh name="L_hip_servo" file="Servo Leg Housing Servo.stl" class="mirror" />
         <mesh name="L_thigh" file="Upper Leg Asembly.stl" class="mirror" />
         <mesh name="L_shin" file="Lower Leg.stl" class="mirror" />
-        <mesh name="L_shin_servo" file="GM3506 v2.stl" class="mirror" />
-        <mesh name="L_wheel_adapter" file="WheelAdapter.stl" class="mirror" />
+        <mesh name="L_shin_servo" file="Lower Servo.stl" class="mirror" />
         <mesh name="L_link" file="Leg Link Assembly.stl" class="mirror" />
         <mesh name="L_foot" file="Wheel.stl" class="mirror" />
     </asset>
     <worldbody>
         <body name="body" quat="0.7071 0 0 0.7071">
             <site name="ImuSensor" pos="0 0 0" euler="0 0 -1.57079633" />
-            <geom mesh="bat_cap" mass="0.011" />
-            <geom mesh="bat_main" mass="0.025" />
-            <geom mesh="back" mass="0.02" />
-            <geom mesh="mounting_plate" mass="0.065" />
-            <geom mesh="rocker_switch" mass="0.06" />
+            <geom mesh="back_cap" mass="0.015" />
+            <geom mesh="back" mass="0.034" />
+            <geom mesh="mounting_plate" mass="0.15" />
             <!--<geom mesh="shell" mass="0.122" />-->
-            <geom mesh="battery" mass="0.22" />
+            <geom mesh="battery" mass="0.37" />
             <geom type="box" size="0.028 0.042 0.005" pos="0 -0.0265 0.04579" mass="0.08" />
 
-            <body name="R_leg" pos="-0.0579 0 0">
-                <geom mesh="R_hip" mass="0.03" />
+            <body name="R_leg" pos="-0.0654 0 0">
+                <geom mesh="R_hip" mass="0.045" />
                 <geom mesh="R_hip_servo" mass="0.063" />
                 <body name="R_thigh">
-                    <joint name="R_hip" pos="-0.019 -0.000008 0.000007" />
-                    <geom mesh="R_thigh" mass="0.05" />
+                    <joint name="R_hip" pos="-0.0177 -0.000008 0.000007" />
+                    <geom mesh="R_thigh" mass="0.055" />
                     <body name="R_shin">
-                        <joint name="R_shin" pos="-0.019 0.0548 -0.077343" />
+                        <joint name="R_shin" pos="-0.0177 0.068524 -0.096679" />
                         <geom mesh="R_shin" mass="0.067" />
+                        <geom mesh="R_shin_servo" mass="0.063" />
                         <body name="R_link">
-                            <joint name="R_link" pos="-0.019 0.069236 -0.057164" />
-                            <geom mesh="R_link" mass="0.035" />
+                            <joint name="R_link" pos="-0.0177 0.086545 -0.071455" />
+                            <geom mesh="R_link" mass="0.047" />
                         </body>
                         <body name="R_foot">
-                            <geom mesh="R_shin_servo" mass="0.063" />
-                            <joint name="R_foot" pos="-0.019 -0.000496 -0.154963" />
-                            <geom mesh="R_foot" mass="0.061" contype="0" conaffinity="0" />
-                            <geom pos="-0.045 -0.000496 -0.154963" mass="0" class="foot_collider" />
+                            <joint name="R_foot" pos="-0.0177 -0.000838 -0.193474" />
+                            <geom mesh="R_foot" mass="0.35" contype="0" conaffinity="0" />
+                            <geom pos="-0.045 -0.000838 -0.193474" class="foot_collider" />
                         </body>
                     </body>
                 </body>
             </body>
 
-            <body name="L_leg" pos="0.0579 0 0">
-                <geom mesh="L_hip" mass="0.03" />
+            <body name="L_leg" pos="0.0654 0 0">
+                <geom mesh="L_hip" mass="0.045" />
                 <geom mesh="L_hip_servo" mass="0.063" />
                 <body name="L_thigh">
-                    <joint name="L_hip" pos="-0.019 -0.000008 0.000007" />
-                    <geom mesh="L_thigh" mass="0.05" />
+                    <joint name="L_hip" pos="-0.0177 -0.000008 0.000007" />
+                    <geom mesh="L_thigh" mass="0.055" />
                     <body name="L_shin">
-                        <joint name="L_shin" pos="-0.019 0.0548 -0.077343" />
+                        <joint name="L_shin" pos="-0.0177 0.068524 -0.096679" />
                         <geom mesh="L_shin" mass="0.067" />
+                        <geom mesh="L_shin_servo" mass="0.063" />
                         <body name="L_link">
-                            <joint name="L_link" pos="-0.019 0.069236 -0.057164" />
-                            <geom mesh="L_link" mass="0.035" />
+                            <joint name="L_link" pos="-0.0177 0.086545 -0.071455" />
+                            <geom mesh="L_link" mass="0.047" />
                         </body>
                         <body name="L_foot">
-                            <geom mesh="L_shin_servo" mass="0.063" />
-                            <joint name="L_foot" pos="-0.019 -0.000496 -0.154963" />
-                            <geom mesh="L_foot" mass="0.061" contype="0" conaffinity="0" />
-                            <geom pos="0.045 -0.000496 -0.154963" mass="0" class="foot_collider" />
+                            <joint name="L_foot" pos="-0.0177 -0.000838 -0.193474" />
+                            <geom mesh="L_foot" mass="0.35" contype="0" conaffinity="0" />
+                            <geom pos="0.045 -0.000838 -0.193474" class="foot_collider" />
                         </body>
                     </body>
                 </body>
             </body>
-        
+
         </body>
     </worldbody>
     <equality>
-        <connect anchor="-0.019 0.033083 0.033665" body1="body" body2="R_link"
+        <connect anchor="-0.0177 0.041353 0.042082" body1="body" body2="R_link"
             name="eq_constraint_R" />
-        <connect anchor="-0.019 0.033083 0.033665" body1="body" body2="L_link"
+        <connect anchor="-0.0177 0.041353 0.042082" body1="body" body2="L_link"
             name="eq_constraint_L" />
     </equality>
     <contact>
@@ -122,6 +116,12 @@
         <position name="L_hip" joint="L_hip" kp="32" kv="5" ctrlrange="-0.20 0.65" />
         <position name="R_hip" joint="R_hip" kp="32" kv="5" ctrlrange="-0.20 0.65" />
 
+        <!--<motor name="L_foot" joint="L_foot"
+            ctrllimited="true" ctrlrange="-1.96 1.96"
+            gear="1" />
+        <motor name="R_foot" joint="R_foot"
+            ctrllimited="true" ctrlrange="-1.96 1.96"
+            gear="1" />-->
         <velocity name="L_foot" joint="L_foot"
             ctrllimited="true" ctrlrange="-20 20"
             forcelimited="true" forcerange="-1.96 1.96"
