@@ -33,11 +33,23 @@ public:
 
     struct Config {
         Id id;
-        int polePairs;
+
+        // pinout
         int pinA;
         int pinB;
         int pinC;
         int pinEnable;
+
+        // motor parameters
+        int polePairs;
+        float phaseResistance;
+        float kvRating;
+
+        float ktRating() const { return 30.0f / (PI * kvRating); }
+
+        // calibration parameters
+        float zero_electric_angle; // rad
+        Direction sensor_direction = Direction::UNKNOWN;
     };
 
     struct Data {

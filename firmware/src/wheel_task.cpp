@@ -2,20 +2,7 @@
 #include "debug.hpp"
 #include "shared_state.hpp"
 #include "wheel.hpp"
-
-static Wheel::Config leftWheelConfig{.id = Wheel::Id::Left,
-                                     .polePairs = 11,
-                                     .pinA = 12,
-                                     .pinB = 14,
-                                     .pinC = 27,
-                                     .pinEnable = 13};
-
-static Wheel::Config rightWheelConfig{.id = Wheel::Id::Right,
-                                      .polePairs = 11,
-                                      .pinA = 4,
-                                      .pinB = 33,
-                                      .pinC = 32,
-                                      .pinEnable = 2};
+#include "config.hpp"
 
 static WheelsStatus status{
     .updateRate = 0.0,
@@ -31,7 +18,7 @@ static TwoWire wire1(1);
 
 static constexpr long kClockSpeed = 400000; // 400 kHz
 static constexpr float kVoltageSupply = 12.0;
-static constexpr float kVoltageLimit = 5.0;
+static constexpr float kVoltageLimit = 10.0;
 
 static long lastUpdateTime = 0;
 
