@@ -14,7 +14,7 @@ static constexpr const char *kNvsKeyVoltageLimit = "tun_vlt";
 Wheel::Wheel(Config config)
     : _data{}, _command{false, 0.0}, _id(config.id), _sensor(AS5600_I2C),
       _driver(config.pinA, config.pinB, config.pinC, config.pinEnable),
-      _motor(config.polePairs) {}
+      _motor(config.polePairs, config.phaseResistance) {}
 
 static const char *nvsCalibNamespace(Wheel::Id id) {
   return id == Wheel::Id::Left ? "wobl_whl_cl" : "wobl_whl_cr";
@@ -100,7 +100,9 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   _sensor.min_elapsed_time = 0.001f; // 1 ms = 1 kHz update rate
   _sensor.init(&wire);
 
+  _motor.foc_modulation = FOCModulationType::SpaceVectorPWM;
   _motor.linkSensor(&_sensor);
+  _motor.current_limit = 1.0f;
 
   _driver.voltage_power_supply = voltage_supply;
   _driver.voltage_limit = voltage_limit;
@@ -112,8 +114,11 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   _motor.linkDriver(&_driver);
 
   _motor.controller = MotionControlType::velocity;
+  //_motor.controller = MotionControlType::torque;
+  //_motor.torque_controller = TorqueControlType::estimated_current;
+
   _motor.voltage_sensor_align = 5.0f;
-  _motor.motion_downsample = 2; // Try to stabilize velocity estimation
+  _motor.motion_downsample = 3; // Try to stabilize velocity estimation
   if (!loadTuningFromNvs()) {
     tune(VelocityTuning());
   }

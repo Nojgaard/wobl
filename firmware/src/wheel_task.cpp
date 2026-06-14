@@ -18,7 +18,7 @@ static TwoWire wire1(1);
 
 static constexpr long kClockSpeed = 400000; // 400 kHz
 static constexpr float kVoltageSupply = 12.0;
-static constexpr float kVoltageLimit = 10.0;
+static constexpr float kVoltageLimit = 5.0;
 
 static long lastUpdateTime = 0;
 

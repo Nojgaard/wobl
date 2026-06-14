@@ -13,7 +13,7 @@ class Controller:
         self._k = compute_lqr_gains()
         self.integral_error = 0.0
         #self.offset_pitch = 0.0313
-        self.offset_pitch = 0.1
+        self.offset_pitch = 0.075
         # self.offset_pitch = 0.04
         self._dt: float = 0.01  # seconds; set each tick from telemetry timestamps
         self._last_telem_ms: int | None = None  # firmware timestamp of previous telemetry packet
@@ -78,7 +78,7 @@ class Controller:
         fwd_velocity = self.fwd_velocity.value - cmd_fwd_velocity
 
         self.integral_error += fwd_velocity * self._dt
-        self.integral_error = np.clip(self.integral_error, -0.2, 0.2)
+        self.integral_error = np.clip(self.integral_error, -0.3, 0.3)
 
         ctrl_vel = (
             -k_pitch * pitch
@@ -87,13 +87,15 @@ class Controller:
             + k_position * self.integral_error
         )
 
+        #print(f"torqe: {ctrl_vel / 0.059} A")
+        #torque_a = ctrl_vel / 0.059  # Convert desired wheel velocity to torque (A) using motor constant
         # Desired velocity commands
         ctrl_yaw_rate = cmd_yaw_rate
 
         ctrl_left_rps, ctrl_right_rps = self.diff_drive.inverse_kinematics(
             ctrl_vel, ctrl_yaw_rate
         )
-
+        #torque_a = np.clip(torque_a, -0.5, 0.5)  # Limit torque to ±0.5 A for safety
         return DriveCommand(
             left_enabled=True,
             left_velocity=float(ctrl_left_rps),

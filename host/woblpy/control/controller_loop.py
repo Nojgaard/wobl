@@ -34,7 +34,7 @@ class ControllerLoop:
     def __init__(
         self,
         hardware: Hardware,
-        drive_hz: float = 100.0,
+        drive_hz: float = 150.0,
         pose_hz: float = 15.0,
         on_state: Optional[
             Callable[[DriveTelemetry, DriveCommand, PoseTelemetry], None]
