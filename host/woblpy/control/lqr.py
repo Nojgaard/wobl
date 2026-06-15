@@ -10,44 +10,62 @@ def compute_lqr_gains():
     """
 
     # ---- System Dynamics Parameters ----
-    #mass = 1.21  # Mass of the robot (kg)
-    #com_length = 0.08089132455005064  # Height of the center of mass (m)
+    # Two-mass coupled model: body (pendulum) + wheels (cart).
+    # A single point mass gives a singular coupling matrix (Δ=0);
+    # nonzero wheel mass is required for a well-posed system.
+    #
+    # Masses from robot.xml: total ~1.2 kg, wheels 0.061 kg each.
 
-    mass = 1.2  # Mass of the robot (kg)
-    com_length = 0.06089132455005064  # Height of the center of mass (m)
-    gravity = 9.80665  # Acceleration due to gravity (m/s^2)
-    wheel_radius = 0.04  # Radius of the wheels (m)
+    m_b = 1.078              # Body mass above axle = total - 2×wheel (kg)
+    m_w = 0.061              # Single wheel mass (kg)
+    com_length = 0.06089132455005064  # Height of CoM above wheel axle (m)
+    gravity = 9.80665        # Acceleration due to gravity (m/s²)
+    wheel_radius = 0.04      # Radius of the wheels (m)
+
+    # ---- Derived quantities ----
+    I_b = 0.0                # Body moment of inertia about own CoM (point-mass approx)
+    I_w = 0.5 * m_w * wheel_radius**2  # Wheel moment of inertia (solid disk approx)
+    I_axle = I_b + m_b * com_length**2   # Body inertia about wheel axle (parallel axis)
+    M_eff = m_b + 2*m_w + 2*I_w / wheel_radius**2  # Effective translational mass
+    Delta = I_axle * M_eff - (m_b * com_length)**2  # Coupling determinant (>0)
 
     # ---- Continuous-Time State-Space Model ----
     #
-    # We approximate the robot as a single inverted pendulum on wheels.
+    # Coupled inverted-pendulum-on-wheels model.
+    # Derived from two linearized equations solved simultaneously:
+    #
+    #   Body rotation about axle:  I_axle·θ̈ + m_b·l·v̇ = m_b·g·l·θ
+    #   Combined translation:      m_b·l·θ̈ + M_eff·v̇ = τ / r
     #
     # State vector x = [θ, θ̇, v]
     #   θ   : Body pitch angle (rad)
     #   θ̇  : Body angular velocity (rad/s)
     #   v   : Robot linear velocity (m/s)
     #
-    # Input u = Wheel torque (Nm)
+    # Input u = Wheel torque τ (Nm)
     #
-    # The A matrix describes how the state evolves with no input:
+    # Solving the 2×2 system (Δ = I_axle·M_eff − (m_b·l)²):
+    #   θ̈ = (M_eff·m_b·g·l / Δ)·θ  −  (m_b·l / (r·Δ))·τ
+    #   v̇ = (−(m_b·l)²·g / Δ)·θ  +  (I_axle / (r·Δ))·τ
+    #
+    a_21 = M_eff * m_b * gravity * com_length / Delta
+    a_31 = -((m_b * com_length) ** 2) * gravity / Delta
+    b_21 = -m_b * com_length / (wheel_radius * Delta)
+    b_31 = I_axle / (wheel_radius * Delta)
+
     A = np.array(
         [
-            [0, 1, 0],  # d(θ)/dt = θ̇
-            [gravity / com_length, 0, 0],  # d(θ̇)/dt ∝ gravity and CoM height
-            [-gravity / mass, 0, 0],  # d(v)/dt affected by body angle
+            [0, 1, 0],      # d(θ)/dt = θ̇
+            [a_21, 0, 0],   # θ̈  (>0, gravity amplifies tilt)
+            [a_31, 0, 0],   # v̇  (<0, forward tilt pushes wheels back)
         ]
     )
 
-    # The B matrix describes how the input torque affects the system.
-    #
-    # It captures how wheel torque influences:
-    #   - Angular acceleration of the body
-    #   - Linear acceleration of the robot
     B = np.array(
         [
-            [0],  # Torque does not directly influence θ
-            [-1 / (mass * (com_length**2))],  # Torque creates angular acceleration
-            [1 / mass],  # Torque creates linear acceleration
+            [0],            # τ does not directly affect θ
+            [b_21],         # θ̈ contribution  (<0, torque tilts body backward)
+            [b_31],         # v̇ contribution   (>0, torque accelerates robot forward)
         ]
     )
 

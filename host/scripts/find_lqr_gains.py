@@ -106,7 +106,7 @@ def main():
 
     # Weighting matrices
     Q = np.diag([3.0, 0.2, 1.5, 1.0])  # Penalizing theta, theta_dot, x, and x_dot
-    R = np.array([[0.8]])  # Penalizing control effort
+    R = np.array([[1.0]])  # Penalizing control effort
 
     # Define which states to use for integral action
     # This matrix defines what linear combination of states to integrate

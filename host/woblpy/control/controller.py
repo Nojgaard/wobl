@@ -83,8 +83,8 @@ class Controller:
         ctrl_vel = (
             -k_pitch * pitch
             - k_pitch_rate * pitch_rate
-            + k_velocity * fwd_velocity
-            + k_position * self.integral_error
+            - k_velocity * fwd_velocity
+            - k_position * self.integral_error
         )
 
         #print(f"torqe: {ctrl_vel / 0.059} A")
