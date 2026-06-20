@@ -115,7 +115,7 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
 
   _motor.controller = MotionControlType::velocity;
   //_motor.controller = MotionControlType::torque;
-  //_motor.torque_controller = TorqueControlType::estimated_current;
+  _motor.torque_controller = TorqueControlType::estimated_current;
 
   _motor.voltage_sensor_align = 5.0f;
   _motor.motion_downsample = 3; // Try to stabilize velocity estimation
