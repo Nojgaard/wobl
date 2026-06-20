@@ -58,9 +58,12 @@ bool Wheel::loadTuningFromNvs() {
     tuning.p = prefs.getFloat(kNvsKeyTuningP, tuning.p);
     tuning.i = prefs.getFloat(kNvsKeyTuningI, tuning.i);
     tuning.d = prefs.getFloat(kNvsKeyTuningD, tuning.d);
-    tuning.lpf_velocity_tf = prefs.getFloat(kNvsKeyTuningLpf, tuning.lpf_velocity_tf);
-    tuning.velocity_limit = prefs.getFloat(kNvsKeyVelocityLimit, tuning.velocity_limit);
-    tuning.voltage_limit = prefs.getFloat(kNvsKeyVoltageLimit, tuning.voltage_limit);
+    tuning.lpf_velocity_tf =
+        prefs.getFloat(kNvsKeyTuningLpf, tuning.lpf_velocity_tf);
+    tuning.velocity_limit =
+        prefs.getFloat(kNvsKeyVelocityLimit, tuning.velocity_limit);
+    tuning.voltage_limit =
+        prefs.getFloat(kNvsKeyVoltageLimit, tuning.voltage_limit);
     prefs.end();
 
     tune(tuning);
@@ -118,10 +121,11 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   _motor.torque_controller = TorqueControlType::estimated_current;
 
   _motor.voltage_sensor_align = 5.0f;
-  _motor.motion_downsample = 3; // Try to stabilize velocity estimation
+  _motor.motion_downsample = 2; // Try to stabilize velocity estimation
   if (!loadTuningFromNvs()) {
     tune(VelocityTuning());
   }
+  _motor.LPF_angle.Tf = 0.001f;
 
   status = _motor.init();
   if (status != 1) {
@@ -226,6 +230,22 @@ void Wheel::update() {
 
   if (!isOk())
     return;
+
+  // Back-EMF feed-forward: voltage needed to maintain commanded velocity
+  // Kv = 170 RPM/V → 17.8 rad/s/V → coeff = 1 / 17.8 ≈ 0.056
+  float backEmf = _command.velocity * 0.056f;
+
+  // Coulomb friction as a saturating linear ramp — smooth through zero
+  float absVel = fabsf(_command.velocity);
+  float frictionMag;
+  if (absVel < 1.5f) {
+    frictionMag = absVel * (0.3f / 1.5f); // ramp: 0 → 0.3V over 0 → 1.5 rad/s
+  } else {
+    frictionMag = 0.3f; // saturate at max friction
+  }
+  float friction = (_command.velocity >= 0) ? frictionMag : -frictionMag;
+
+  _motor.feed_forward_voltage.q = backEmf + friction;
 
   _motor.loopFOC();
   _motor.move(_command.velocity);
