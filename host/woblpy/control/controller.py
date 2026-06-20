@@ -13,7 +13,7 @@ class Controller:
         self._k = compute_lqr_gains()
         self.integral_error = 0.0
         #self.offset_pitch = 0.0313
-        self.offset_pitch = 0.075
+        self.offset_pitch = 0.070
         # self.offset_pitch = 0.04
         self._dt: float = 0.01  # seconds; set each tick from telemetry timestamps
         self._last_telem_ms: int | None = None  # firmware timestamp of previous telemetry packet
@@ -22,8 +22,8 @@ class Controller:
         self.pitch = 0.0
         self.yaw = 0.0
 
-        self.roll_rate = LinearFilter(0.5, 0.0)
-        self.pitch_rate = LinearFilter(1.0, 0.0)
+        self.roll_rate = LinearFilter(0.8, 0.0)
+        self.pitch_rate = LinearFilter(0.9, 0.0)
         # self.pitch_rate = KalmanFilter(0.1, 0.02)
 
         self.yaw_rate = LinearFilter(0.5, 0.0)

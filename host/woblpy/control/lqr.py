@@ -90,7 +90,7 @@ def compute_lqr_gains():
 
     # R penalizes the control effort (wheel torque).
     # Larger R → less aggressive control (reduced torque usage).
-    R = np.array([[1.0]])
+    R = np.array([[1.5]])
 
     # ---- Integral Action ----
     #

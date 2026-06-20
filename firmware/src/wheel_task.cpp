@@ -87,7 +87,7 @@ static void update(SharedState &state) {
 
   // Command + telemetry sync at 200 Hz
   long now = millis();
-  if (now - lastUpdateTime < 5) {
+  if (now - lastUpdateTime < 4) {
     return;
   }
 
