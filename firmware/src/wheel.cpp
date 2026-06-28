@@ -14,7 +14,7 @@ static constexpr const char *kNvsKeyVoltageLimit = "tun_vlt";
 Wheel::Wheel(Config config)
     : _data{}, _command{false, 0.0}, _id(config.id), _sensor(AS5600_I2C),
       _driver(config.pinA, config.pinB, config.pinC, config.pinEnable),
-      _motor(config.polePairs, config.phaseResistance) {}
+      _motor(config.polePairs, config.phaseResistance, config.kvRating) {}
 
 static const char *nvsCalibNamespace(Wheel::Id id) {
   return id == Wheel::Id::Left ? "wobl_whl_cl" : "wobl_whl_cr";
@@ -89,12 +89,21 @@ bool Wheel::saveTuningToNvs() {
   return success;
 }
 
+bool pingAS5600(TwoWire &wire) {
+  for (int i = 0; i < 5; ++i) {
+    wire.beginTransmission(0x36);
+    if (wire.endTransmission() == 0) {
+      return true;
+    }
+    delay(100);
+  }
+  return false;
+}
+
 int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   _status = Status::Uninitialized;
 
-  // Probe the AS5600 before handing off to SimpleFOC.
-  wire.beginTransmission(0x36);
-  if (wire.endTransmission() != 0) {
+  if (!pingAS5600(wire)) {
     DPRINTF("[wheel] sensor not found on this bus\r\n");
     return static_cast<int>(_status); // sensor not found on this bus
   }
@@ -179,9 +188,11 @@ void Wheel::tune(const VelocityTuning &tuning, bool persist) {
   _motor.PID_velocity.I = tuning.i;
   _motor.PID_velocity.D = tuning.d;
   _motor.LPF_velocity.Tf = tuning.lpf_velocity_tf;
+  //_motor.PID_velocity.output_ramp
 
   _motor.updateVelocityLimit(tuning.velocity_limit);
   _motor.updateVoltageLimit(tuning.voltage_limit);
+  _motor.PID_velocity.output_ramp = 100.0f;
 
   if (persist)
     saveTuningToNvs();
@@ -224,6 +235,25 @@ void Wheel::command(bool enabled, float velocity) {
   }
 }
 
+void addFeedForwardEffects(BLDCMotor &motor, const Wheel::Command &command) {
+  float ffVoltage = 0.0f;
+
+  // Coulomb friction
+  constexpr float kCoulombV = 0.35f;
+  constexpr float kCoulombRamp = 1.0f;
+  float absCmd = fabsf(command.velocity);
+  float mag =
+      (absCmd < kCoulombRamp) ? kCoulombV * (absCmd / kCoulombRamp) : kCoulombV;
+  ffVoltage += (command.velocity >= 0) ? mag : -mag;
+
+  // Velocity feedforward
+  /*float kffVel = 0.3f;
+  float ffVelCurrent = kffVel * command.velocity;
+  ffVoltage += ffVelCurrent;*/
+
+  motor.feed_forward_voltage.q = ffVoltage;
+}
+
 void Wheel::update() {
   if (_motor.motor_status == FOCMotorStatus::motor_error)
     _status = Status::MotorError;
@@ -231,22 +261,7 @@ void Wheel::update() {
   if (!isOk())
     return;
 
-  // Back-EMF feed-forward: voltage needed to maintain commanded velocity
-  // Kv = 170 RPM/V → 17.8 rad/s/V → coeff = 1 / 17.8 ≈ 0.056
-  float backEmf = _command.velocity * 0.056f;
-
-  // Coulomb friction as a saturating linear ramp — smooth through zero
-  float absVel = fabsf(_command.velocity);
-  float frictionMag;
-  if (absVel < 1.5f) {
-    frictionMag = absVel * (0.3f / 1.5f); // ramp: 0 → 0.3V over 0 → 1.5 rad/s
-  } else {
-    frictionMag = 0.3f; // saturate at max friction
-  }
-  float friction = (_command.velocity >= 0) ? frictionMag : -frictionMag;
-
-  _motor.feed_forward_voltage.q = backEmf + friction;
-
+  addFeedForwardEffects(_motor, _command);
   _motor.loopFOC();
   _motor.move(_command.velocity);
 
