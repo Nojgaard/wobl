@@ -54,11 +54,11 @@ _WHEEL_TARGET_RIGHT = 2
 
 # ---------------------------------------------------------------------------
 # Packed struct formats (little-endian, matches __attribute__((packed)) layout)
-# Sizes: DRIVE_CMD=10, DRIVE_TELEM=48, POSE_CMD=10, POSE_TELEM=26,
+# Sizes: DRIVE_CMD=10, DRIVE_TELEM=56, POSE_CMD=10, POSE_TELEM=26,
 #        STATUS=26, CALIB_PAYLOAD=25, CALIB_ACK=1
 # ---------------------------------------------------------------------------
 _FMT_DRIVE_CMD = struct.Struct("<BfBf")       # enabled_l, vel_l, enabled_r, vel_r
-_FMT_DRIVE_TELEM = struct.Struct("<11fI")     # 4 quat(xyzw) + 3 gyr + la + lv + ra + rv + ts_ms
+_FMT_DRIVE_TELEM = struct.Struct("<13fI")     # 4 quat(xyzw) + 3 gyr + la + lv + lc + ra + rv + rc + ts_ms
 _FMT_POSE_CMD = struct.Struct("<BfBf")        # enabled_l, pos_l, enabled_r, pos_r
 _FMT_POSE_TELEM = struct.Struct("<BB6f")      # valid_l, valid_r, lp, lv, le, rp, rv, re
 _FMT_STATUS = struct.Struct("<ifffiiBB")      # imu_st, imu_hz, foc_hz, whl_hz, l_st, r_st, l_ok, r_ok
@@ -66,8 +66,8 @@ _FMT_CALIB_PAYLOAD = struct.Struct("<B9i")    # target, gyr[3], acc[3], mag[3] â
 _FMT_CALIB_ACK = struct.Struct("<B")          # success
 _FMT_WHEEL_CALIB_CMD = struct.Struct("<B")    # target
 _FMT_WHEEL_CALIB_DATA = struct.Struct("<Bfi") # target, zero angle, sensor direction
-_FMT_WHEEL_TUNING_WRITE = struct.Struct("<B6fB") # target, p/i/d/tf/vel_limit/volt_limit, persist
-_FMT_WHEEL_TUNING_DATA = struct.Struct("<B6f") # target, p/i/d/tf/vel_limit/volt_limit
+_FMT_WHEEL_TUNING_WRITE = struct.Struct("<B7fB") # target, p/i/d/ramp/tf/vel_limit/volt_limit, persist
+_FMT_WHEEL_TUNING_DATA = struct.Struct("<B7f") # target, p/i/d/ramp/tf/vel_limit/volt_limit
 
 # VIDs for common ESP32 USB-serial bridge chips
 _ESP32_VIDS = {
@@ -215,14 +215,16 @@ class WoblSerial:
         )
         self._send(_MSG_CMD_DRIVE, body)
         raw = self._recv(_MSG_TELEM_DRIVE)
-        x, y, z, w, gx, gy, gz, la, lv, ra, rv, ts = _FMT_DRIVE_TELEM.unpack(raw)
+        x, y, z, w, gx, gy, gz, la, lv, lc, ra, rv, rc, ts = _FMT_DRIVE_TELEM.unpack(raw)
         return DriveTelemetry(
             quat_xyzw=(x, y, z, w),
             gyro=(gx, gy, gz),
             left_angle=la,
             left_vel=lv,
+            left_current=lc,
             right_angle=ra,
             right_vel=rv,
+            right_current=rc,
             timestamp_ms=ts,
         )
 
@@ -310,6 +312,7 @@ class WoblSerial:
         p: float,
         i: float,
         d: float,
+        output_ramp: float = 100.0,
         lpf_velocity_tf: float,
         velocity_limit: float,
         voltage_limit: float,
@@ -323,6 +326,7 @@ class WoblSerial:
             p,
             i,
             d,
+            output_ramp,
             lpf_velocity_tf,
             velocity_limit,
             voltage_limit,
@@ -339,12 +343,13 @@ class WoblSerial:
 
         self._send(_MSG_WHEEL_TUNING_READ_REQ, bytes([target]))
         raw = self._recv(_MSG_WHEEL_TUNING_DATA)
-        t, p, i, d, lpf_tf, velocity_limit, voltage_limit = _FMT_WHEEL_TUNING_DATA.unpack(raw)
+        t, p, i, d, ramp, lpf_tf, velocity_limit, voltage_limit = _FMT_WHEEL_TUNING_DATA.unpack(raw)
         return WheelTuningPayload(
             target=t,
             p=p,
             i=i,
             d=d,
+            output_ramp=ramp,
             lpf_velocity_tf=lpf_tf,
             velocity_limit=velocity_limit,
             voltage_limit=voltage_limit,

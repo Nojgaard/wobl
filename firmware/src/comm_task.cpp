@@ -93,8 +93,10 @@ static void sendDriveTelem(SharedState *state) {
   telem.gyr[2] = imu.gyr[2];
   telem.leftAngle = wheels.left.angle;
   telem.leftVel = wheels.left.velocity;
+  telem.leftCurrent = wheels.left.current;
   telem.rightAngle = wheels.right.angle;
   telem.rightVel = wheels.right.velocity;
+  telem.rightCurrent = wheels.right.current;
   telem.timestampMs = (uint32_t)millis();
 
   sendPacket(MSG_TELEM_DRIVE, &telem, sizeof(telem));
@@ -251,6 +253,7 @@ static void handleWheelTuningWrite(SharedState *state, const uint8_t *body, size
     req.tuning.p = clamp(msg.p, 0.0f, 20.0f);
     req.tuning.i = clamp(msg.i, 0.0f, 50.0f);
     req.tuning.d = clamp(msg.d, 0.0f, 5.0f);
+    req.tuning.output_ramp = clamp(msg.outputRamp, 0.0f, 500.0f);
     req.tuning.lpf_velocity_tf = clamp(msg.lpfVelocityTf, 0.001f, 0.2f);
     req.tuning.velocity_limit = clamp(msg.velocityLimit, 1.0f, 80.0f);
     req.tuning.voltage_limit = clamp(msg.voltageLimit, 0.5f, 12.0f);
@@ -284,6 +287,7 @@ static void handleWheelTuningReadReq(SharedState *state, const uint8_t *body, si
   payload.p = tuning.p;
   payload.i = tuning.i;
   payload.d = tuning.d;
+  payload.outputRamp = tuning.output_ramp;
   payload.lpfVelocityTf = tuning.lpf_velocity_tf;
   payload.velocityLimit = tuning.velocity_limit;
   payload.voltageLimit = tuning.voltage_limit;

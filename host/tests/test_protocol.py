@@ -29,7 +29,7 @@ def test_drive_cmd_size() -> None:
 
 
 def test_drive_telem_size() -> None:
-    assert _FMT_DRIVE_TELEM.size == 48
+    assert _FMT_DRIVE_TELEM.size == 56
 
 
 def test_pose_cmd_size() -> None:
@@ -81,10 +81,11 @@ def test_drive_cmd_disabled() -> None:
 def test_drive_telem_pack_unpack() -> None:
     values = (1.0, 0.0, 0.0, 0.0,   # quat wxyz
               0.1, -0.2, 0.3,        # gyro xyz
-              0.5, 1.2, -0.5, -1.2,  # la, lv, ra, rv
+              0.5, 1.2, 0.8,         # la, lv, lc
+              -0.5, -1.2, -0.7,      # ra, rv, rc
               12345)                  # timestamp_ms
     packed = _FMT_DRIVE_TELEM.pack(*values)
-    assert len(packed) == 48
+    assert len(packed) == 56
     unpacked = _FMT_DRIVE_TELEM.unpack(packed)
     assert unpacked[-1] == 12345
     for a, b in zip(unpacked[:-1], values[:-1]):

@@ -70,6 +70,8 @@ class Recorder:
         self.configure_series("wheel/cmd/right/velocity", name="Right Wheel Cmd Vel", color=(255, 80,  255))
         self.configure_series("wheel/telem/left/velocity",  name="Left Wheel Velocity",  color=(80,  80,  255))
         self.configure_series("wheel/telem/right/velocity", name="Right Wheel Velocity", color=(255, 200, 0))
+        self.configure_series("wheel/telem/left/current",   name="Left Wheel Current",  color=(80,  255, 80))
+        self.configure_series("wheel/telem/right/current",  name="Right Wheel Current", color=(255, 255, 80))
 
         self.configure_series("controller/fwd_velocity", name="Controller Fwd Vel", color=(255, 160, 0))
         self.configure_series("controller/fwd_velocity_raw", name="Controller Fwd Vel Raw", color=(255, 160, 100))
@@ -110,6 +112,8 @@ class Recorder:
                 "wheel/cmd/right/velocity": cmd.right_velocity,
                 "wheel/telem/left/velocity": telem.left_vel,
                 "wheel/telem/right/velocity": telem.right_vel,
+                "wheel/telem/left/current": telem.left_current,
+                "wheel/telem/right/current": telem.right_current,
                 "controller/fwd_velocity": controller.fwd_velocity.value,
                 "controller/fwd_velocity_raw": controller.fwd_velocity_raw,
             },

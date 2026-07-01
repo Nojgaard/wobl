@@ -35,8 +35,10 @@ class DriveTelemetry:
     )
     left_angle: float = 0.0
     left_vel: float = 0.0
+    left_current: float = 0.0
     right_angle: float = 0.0
     right_vel: float = 0.0
+    right_current: float = 0.0
     timestamp_ms: int = 0
 
     def orientation_euler(self) -> tuple[float, float, float]:
@@ -115,6 +117,7 @@ class WheelTuningPayload:
     p: float = 0.1
     i: float = 0.5
     d: float = 0.0
+    output_ramp: float = 100.0   # V/s max change rate of PID output
     lpf_velocity_tf: float = 0.01
     velocity_limit: float = 40.0
     voltage_limit: float = 5.0

@@ -109,7 +109,7 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   }
 
   int status = 1;
-  _sensor.min_elapsed_time = 0.001f; // 1 ms = 1 kHz update rate
+  _sensor.min_elapsed_time = 0.005f; // 5 ms = 200 Hz update rate
   _sensor.init(&wire);
 
   _motor.foc_modulation = FOCModulationType::SpaceVectorPWM;
@@ -130,7 +130,7 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   _motor.torque_controller = TorqueControlType::estimated_current;
 
   _motor.voltage_sensor_align = 5.0f;
-  _motor.motion_downsample = 2; // Try to stabilize velocity estimation
+  //_motor.motion_downsample = 2; // Try to stabilize velocity estimation
   if (!loadTuningFromNvs()) {
     tune(VelocityTuning());
   }
@@ -169,14 +169,7 @@ Wheel::Calibration Wheel::calibration() const {
 }
 
 Wheel::VelocityTuning Wheel::tuning() const {
-  return {
-      .p = _motor.PID_velocity.P,
-      .i = _motor.PID_velocity.I,
-      .d = _motor.PID_velocity.D,
-      .lpf_velocity_tf = _motor.LPF_velocity.Tf,
-      .velocity_limit = _motor.velocity_limit,
-      .voltage_limit = _motor.voltage_limit,
-  };
+  return _tuning;
 }
 
 bool Wheel::isOk() const { return _status == Status::Operational; }
@@ -184,16 +177,17 @@ bool Wheel::isOk() const { return _status == Status::Operational; }
 Wheel::Status Wheel::status() const { return _status; }
 
 void Wheel::tune(const VelocityTuning &tuning, bool persist) {
+  _tuning = tuning;
+
   _motor.PID_velocity.P = tuning.p;
   _motor.PID_velocity.I = tuning.i;
   _motor.PID_velocity.D = tuning.d;
   _motor.LPF_velocity.Tf = tuning.lpf_velocity_tf;
-  //_motor.PID_velocity.output_ramp
 
   _motor.updateVelocityLimit(tuning.velocity_limit);
   _motor.updateVoltageLimit(tuning.voltage_limit);
-  _motor.PID_velocity.output_ramp = 100.0f;
-
+  _motor.PID_velocity.output_ramp = tuning.output_ramp;
+  
   if (persist)
     saveTuningToNvs();
 }
@@ -239,8 +233,8 @@ void addFeedForwardEffects(BLDCMotor &motor, const Wheel::Command &command) {
   float ffVoltage = 0.0f;
 
   // Coulomb friction
-  constexpr float kCoulombV = 0.35f;
-  constexpr float kCoulombRamp = 1.0f;
+  constexpr float kCoulombV = 0.3f;
+  constexpr float kCoulombRamp = 0.5f;
   float absCmd = fabsf(command.velocity);
   float mag =
       (absCmd < kCoulombRamp) ? kCoulombV * (absCmd / kCoulombRamp) : kCoulombV;
@@ -261,10 +255,31 @@ void Wheel::update() {
   if (!isOk())
     return;
 
+  // Gain scheduling: at low command velocities, encoder quantization noise
+  // dominates.  Blend toward a heavier LPF and lower P to suppress audible
+  // vibration, then ramp back to the normal tuning for tracking at speed.
+  constexpr float kScheduleThreshold = 0.5f;   // rad/s
+  constexpr float kLowSpeedP = 0.15f;           // reduced P at standstill
+  //constexpr float kLowSpeedRamp = 1.0f;
+
+  float absCmd = fabsf(_command.velocity);
+  float blend = (absCmd < kScheduleThreshold)
+                    ? absCmd / kScheduleThreshold
+                    : 1.0f; // 0 = full low-speed, 1 = full normal
+
+  _motor.PID_velocity.P = kLowSpeedP + blend * (_tuning.p - kLowSpeedP);
+  //_motor.PID_velocity.output_ramp =
+  //    kLowSpeedRamp + blend * (_tuning.output_ramp - kLowSpeedRamp);
+  
+  //_motor.LPF_velocity.Tf =
+  //    _tuning.lpf_velocity_tf +
+  //    (1.0f - blend) * (kLowSpeedLpfTf - _tuning.lpf_velocity_tf);
+
   addFeedForwardEffects(_motor, _command);
   _motor.loopFOC();
   _motor.move(_command.velocity);
 
   _data.angle = _motor.shaft_angle;
   _data.velocity = _motor.shaft_velocity;
+  _data.current = _motor.current_sp;
 }

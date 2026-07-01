@@ -12,11 +12,13 @@ class Controller:
         # self._k = np.array([-7.70647133, -0.87846039, 2.61800094, 1.41421356])
         self._k = compute_lqr_gains()
         self.integral_error = 0.0
-        #self.offset_pitch = 0.0313
-        self.offset_pitch = 0.070
+        # self.offset_pitch = 0.0313
+        self.offset_pitch = 0.07
         # self.offset_pitch = 0.04
         self._dt: float = 0.01  # seconds; set each tick from telemetry timestamps
-        self._last_telem_ms: int | None = None  # firmware timestamp of previous telemetry packet
+        self._last_telem_ms: int | None = (
+            None  # firmware timestamp of previous telemetry packet
+        )
 
         self.roll = 0.0
         self.pitch = 0.0
@@ -30,7 +32,7 @@ class Controller:
         # q=1.0, r=0.25 matches plot_bench.py defaults (validated on bench data)
         self.fwd_velocity = KalmanFilter(2.0, 0.25)
         self.fwd_velocity_raw = 0.0  # for logging/debugging only; not used in control
-        #self.fwd_velocity = LinearFilter(0.05, 0.0)
+        # self.fwd_velocity = LinearFilter(0.05, 0.0)
 
         self.cmd_fwd_velocity = LinearFilter(0.2, 0.0)
         self.cmd_yaw_rate = LinearFilter(0.2, 0.0)
@@ -66,8 +68,8 @@ class Controller:
     def update(self) -> DriveCommand:
         k_pitch = self._k[0]
         k_pitch_rate = self._k[1]
-        k_velocity = self._k[2]   # K[2] = velocity gain (from lqr state: v)
-        k_position = self._k[3]   # K[3] = integral gain (from lqr integral_action on v)
+        k_velocity = self._k[2]  # K[2] = velocity gain (from lqr state: v)
+        k_position = self._k[3]  # K[3] = integral gain (from lqr integral_action on v)
 
         cmd_fwd_velocity = self.cmd_fwd_velocity.value
         cmd_yaw_rate = self.cmd_yaw_rate.value
@@ -87,15 +89,15 @@ class Controller:
             - k_position * self.integral_error
         )
 
-        #print(f"torqe: {ctrl_vel / 0.059} A")
-        #torque_a = ctrl_vel / 0.059  # Convert desired wheel velocity to torque (A) using motor constant
+        # print(f"torqe: {ctrl_vel / 0.059} A")
+        # torque_a = ctrl_vel / 0.059  # Convert desired wheel velocity to torque (A) using motor constant
         # Desired velocity commands
         ctrl_yaw_rate = cmd_yaw_rate
 
         ctrl_left_rps, ctrl_right_rps = self.diff_drive.inverse_kinematics(
             ctrl_vel, ctrl_yaw_rate
         )
-        #torque_a = np.clip(torque_a, -0.5, 0.5)  # Limit torque to ±0.5 A for safety
+        # torque_a = np.clip(torque_a, -0.5, 0.5)  # Limit torque to ±0.5 A for safety
         return DriveCommand(
             left_enabled=True,
             left_velocity=float(ctrl_left_rps),

@@ -19,6 +19,7 @@ public:
         float p = 0.1f;
         float i = 0.5f;
         float d = 0.0f;
+        float output_ramp = 100.0f;  // V/s max change rate of PID output
         float lpf_velocity_tf = 0.01f;
         float velocity_limit = 40.0f; // rad/s
         float voltage_limit = 5.0f;   // V
@@ -55,6 +56,7 @@ public:
     struct Data {
         float angle; // rad
         float velocity; // rad/s
+        float current;
     };
 
     struct Command {
@@ -85,6 +87,7 @@ private:
     Data _data;
     Command _command;
     Id _id;
+    VelocityTuning _tuning{}; // reference tuning for gain scheduling
 
     MagneticSensorI2C _sensor;
     BLDCDriver3PWM _driver;

@@ -61,8 +61,10 @@ struct WireDriveTelem {
     float    gyr[3];        // body-frame angular velocity rad/s
     float    leftAngle;     // rad
     float    leftVel;       // rad/s
+    float    leftCurrent;   // A (current setpoint)
     float    rightAngle;    // rad
     float    rightVel;      // rad/s
+    float    rightCurrent;  // A (current setpoint)
     uint32_t timestampMs;
 } __attribute__((packed));
 
@@ -128,6 +130,7 @@ struct WireWheelTuning {
     float   p;
     float   i;
     float   d;
+    float   outputRamp;
     float   lpfVelocityTf;
     float   velocityLimit;
     float   voltageLimit;
@@ -140,6 +143,7 @@ struct WireWheelTuningData {
     float   p;
     float   i;
     float   d;
+    float   outputRamp;
     float   lpfVelocityTf;
     float   velocityLimit;
     float   voltageLimit;

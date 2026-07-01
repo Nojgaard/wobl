@@ -14,7 +14,7 @@ Commands
   help                    — list commands
   quit / Ctrl-D           — exit
 
-Parameters: p  i  d  tf  vel_lim  volt_lim
+Parameters: p  i  d  ramp  tf  vel_lim  volt_lim
 
 Usage
 -----
@@ -55,6 +55,7 @@ _PARAMS: dict[str, tuple[str, str]] = {
     "p":        ("p",               "P gain"),
     "i":        ("i",               "I gain"),
     "d":        ("d",               "D gain"),
+    "ramp":     ("output_ramp",     "Output ramp"),
     "tf":       ("lpf_velocity_tf", "LPF Tf"),
     "vel_lim":  ("velocity_limit",  "Vel limit"),
     "volt_lim": ("voltage_limit",   "Volt limit"),
@@ -413,7 +414,7 @@ class WheelTuneCLI(cmd.Cmd):
 
     def preloop(self) -> None:
         _header("WOBL Wheel Tuning REPL")
-        print(f"  {CYAN}Params:{RESET}   p  i  d  tf  vel_lim  volt_lim")
+        print(f"  {CYAN}Params:{RESET}   p  i  d  ramp  tf  vel_lim  volt_lim")
         print(f"  {CYAN}Commands:{RESET} show  set  zero  wheel  drive  bench  stop  save  load  quit\n")
         try:
             self._state = self._hw.read_wheel_tuning(WHEEL_LEFT)
