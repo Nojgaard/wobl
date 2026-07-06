@@ -1,6 +1,6 @@
 #pragma once
 
-#include "wheel.hpp"
+#include "drivers/wheel.hpp"
 
 static Wheel::Config leftWheelConfig{
     .id = Wheel::Id::Left,

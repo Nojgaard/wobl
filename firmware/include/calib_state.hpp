@@ -1,8 +1,8 @@
 #pragma once
 
 #include "protected.hpp"
-#include "imu.hpp"
-#include "wheel.hpp"
+#include "drivers/imu.hpp"
+#include "drivers/wheel.hpp"
 
 // Bare trigger: device task saves its current learned state to NVS.
 struct CalibReq {

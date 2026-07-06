@@ -1,9 +1,9 @@
 #pragma once
 #include "protected.hpp"
 #include "calib_state.hpp"
-#include "imu.hpp"
-#include "wheel.hpp"
-#include "servo.hpp"
+#include "drivers/imu.hpp"
+#include "drivers/wheel.hpp"
+#include "drivers/servo.hpp"
 
 struct IMUStatus {
   int status;

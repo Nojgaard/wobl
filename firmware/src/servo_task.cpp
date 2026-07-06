@@ -1,6 +1,6 @@
 #include "servo_task.hpp"
 #include "debug.hpp"
-#include "servo.hpp"
+#include "drivers/servo.hpp"
 
 static constexpr int kServoRxPin = 16;
 static constexpr int kServoTxPin = 17;

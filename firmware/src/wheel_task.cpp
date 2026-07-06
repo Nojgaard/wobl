@@ -1,7 +1,7 @@
 #include "wheel_task.hpp"
 #include "debug.hpp"
 #include "shared_state.hpp"
-#include "wheel.hpp"
+#include "drivers/wheel.hpp"
 #include "config.hpp"
 
 static WheelsStatus status{
