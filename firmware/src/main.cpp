@@ -6,8 +6,6 @@
 #endif
 
 #include <Arduino.h>
-#include <WiFi.h>
-#include <esp_bt.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -16,9 +14,6 @@ long lastUpdateTime = 0;
 static SharedState state;
 
 void setup() {
-  WiFi.mode(WIFI_OFF);
-  esp_bt_controller_disable();
-
 #ifdef DEBUG
   Serial.begin(115200);
 #else
@@ -26,7 +21,7 @@ void setup() {
   xTaskCreatePinnedToCore(commTask, "comm", 4096, &state, 10, NULL, 0);
 #endif
 
-  delay(300);
+  delay(500);
   wheelTaskInit(state);
   servoTaskInit(state);
   imuTaskInit(state);

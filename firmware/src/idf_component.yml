@@ -1,0 +1,3 @@
+dependencies:
+  bluepad32-arduino:
+    git: https://github.com/Nojgaard/bluepad32-arduino

@@ -45,6 +45,7 @@ void printKV(char *) {
 
 void setup() {
   Serial.begin(115200);
+  SimpleFOCDebug::enable(&Serial);
   delay(500);
   Serial.println("WOBL dual-wheel KV estimator — lift both wheels!");
 
@@ -95,7 +96,7 @@ void setup() {
 static uint32_t lastPrint = 0;
 
 void loop() {
-  motorLeft.loopFOC();
+  /*motorLeft.loopFOC();
   motorLeft.move(targetVoltage);
   motorRight.loopFOC();
   motorRight.move(targetVoltage);
@@ -104,5 +105,7 @@ void loop() {
   if (millis() - lastPrint >= 2000) {
     lastPrint = millis();
     printKV(nullptr);
-  }
+  }*/
+
+  delay(1000);
 }
