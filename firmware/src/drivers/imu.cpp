@@ -16,6 +16,8 @@ static const int32_t kDefaultBiasMag[3] = {-230400, 2479070, -3262980};
 
 IMU::IMU() {}
 
+bool IMU::status() const { return _initialized; }
+
 bool IMU::initialize(SPIClass &spi, uint8_t csPin) {
   bool success = true;
 
@@ -67,6 +69,7 @@ bool IMU::initialize(SPIClass &spi, uint8_t csPin) {
   check(icm_.resetDMP(), "resetDMP");
   check(icm_.resetFIFO(), "resetFIFO");
 
+  _initialized = success;
   return success;
 }
 

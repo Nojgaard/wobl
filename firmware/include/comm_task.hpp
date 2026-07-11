@@ -1,6 +1,6 @@
 #pragma once
 
-#include "shared_state.hpp"
+#include "robot.hpp"
 
 #include <stdint.h>
 
@@ -153,5 +153,5 @@ struct WireWheelTuningData {
 // Task interface
 // ---------------------------------------------------------------------------
 
-void commTaskInit(SharedState &state);
-void commTask(void *params); // SharedState*
+void commTaskInit(Robot &robot);
+void commTask(void *params); // Robot*

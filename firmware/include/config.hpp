@@ -2,7 +2,7 @@
 
 #include "drivers/wheel.hpp"
 
-static Wheel::Config leftWheelConfig{
+static constexpr Wheel::Config leftWheelConfig{
     .id = Wheel::Id::Left,
     .pinA = 12,
     .pinB = 14,
@@ -15,7 +15,7 @@ static Wheel::Config leftWheelConfig{
     .sensor_direction = Direction::CCW,
 };
 
-static Wheel::Config rightWheelConfig{
+static constexpr Wheel::Config rightWheelConfig{
     .id = Wheel::Id::Right,
     .pinA = 4,
     .pinB = 33,

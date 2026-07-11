@@ -58,7 +58,7 @@ static void sendPacket(uint8_t type, const void *body, size_t bodyLen) {
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
-static void handleDriveCmd(SharedState *state, const uint8_t *body,
+static void handleDriveCmd(Robot *robot, const uint8_t *body,
                            size_t len) {
   if (len != sizeof(WireDriveCmd))
     return;
@@ -71,17 +71,17 @@ static void handleDriveCmd(SharedState *state, const uint8_t *body,
     return v < -limit ? -limit : (v > limit ? limit : v);
   };
 
-  WheelsCommand wc;
+  WheelSubsystem::Command wc;
   wc.left.enabled = cmd.leftWheel.enabled != 0;
   wc.left.velocity = clamp(cmd.leftWheel.velocity, kMaxWheelVelocity);
   wc.right.enabled = cmd.rightWheel.enabled != 0;
   wc.right.velocity = clamp(cmd.rightWheel.velocity, kMaxWheelVelocity);
-  state->commands.wheels.write(wc);
+  robot->wheels.command(wc);
 }
 
-static void sendDriveTelem(SharedState *state) {
-  IMU::Data imu = state->telemetry.imu.read();
-  WheelsData wheels = state->telemetry.wheels.read();
+static void sendDriveTelem(Robot *robot) {
+  IMU::Data imu = robot->imu.telemetry();
+  WheelSubsystem::Telemetry wheels = robot->wheels.telemetry();
 
   WireDriveTelem telem;
   telem.quatXYZW[0] = imu.orientation[0]; // ICM stores [q1,q2,q3,q0] → x
@@ -102,23 +102,23 @@ static void sendDriveTelem(SharedState *state) {
   sendPacket(MSG_TELEM_DRIVE, &telem, sizeof(telem));
 }
 
-static void handlePoseCmd(SharedState *state, const uint8_t *body, size_t len) {
+static void handlePoseCmd(Robot *robot, const uint8_t *body, size_t len) {
   if (len != sizeof(WirePoseCmd))
     return;
 
   WirePoseCmd cmd;
   memcpy(&cmd, body, sizeof(cmd));
 
-  ServosCommand sc;
+  ServoSubsystem::Command sc;
   sc.left.enabled = cmd.leftServo.enabled != 0;
   sc.left.positionRad = cmd.leftServo.positionRad;
   sc.right.enabled = cmd.rightServo.enabled != 0;
   sc.right.positionRad = cmd.rightServo.positionRad;
-  state->commands.servos.write(sc);
+  robot->servos.command(sc);
 }
 
-static void sendPoseTelem(SharedState *state) {
-  ServosData servos = state->telemetry.servos.read();
+static void sendPoseTelem(Robot *robot) {
+  ServoSubsystem::Telemetry servos = robot->servos.telemetry();
 
   WirePoseTelem telem;
   telem.leftValid = servos.left.valid ? 1 : 0;
@@ -133,28 +133,28 @@ static void sendPoseTelem(SharedState *state) {
   sendPacket(MSG_TELEM_POSE, &telem, sizeof(telem));
 }
 
-static void handleStatusReq(SharedState *state, size_t bodyLen) {
+static void handleStatusReq(Robot *robot, size_t bodyLen) {
   if (bodyLen != 0)
     return;
 
-  IMUStatus imuSt = state->status.imu.read();
-  WheelsStatus wheelSt = state->status.wheels.read();
-  ServosStatus servoSt = state->status.servos.read();
+  ImuSubsystem::Status imuSt = robot->imu.status();
+  WheelSubsystem::Status wheelSt = robot->wheels.status();
+  ServoSubsystem::Status servoSt = robot->servos.status();
 
   WireStatus s;
   s.imuStatus = imuSt.status;
-  s.imuUpdateRate = imuSt.updateRate;
-  s.wheelsFocRate = wheelSt.focRate;
-  s.wheelsUpdateRate = wheelSt.updateRate;
-  s.wheelsLeftStatus = wheelSt.leftStatus;
-  s.wheelsRightStatus = wheelSt.rightStatus;
-  s.servoLeftOk = servoSt.leftOk ? 1 : 0;
-  s.servoRightOk = servoSt.rightOk ? 1 : 0;
+  s.imuUpdateRate = imuSt.syncRateHz;
+  s.wheelsFocRate = wheelSt.updateRateHz;
+  s.wheelsUpdateRate = wheelSt.syncRateHz;
+  s.wheelsLeftStatus = wheelSt.left;
+  s.wheelsRightStatus = wheelSt.right;
+  s.servoLeftOk = servoSt.left;
+  s.servoRightOk = servoSt.right;
 
   sendPacket(MSG_STATUS, &s, sizeof(s));
 }
 
-static void handleCalibWrite(SharedState *state, const uint8_t *body, size_t len) {
+static void handleCalibWrite(Robot *robot, const uint8_t *body, size_t len) {
   if (len != 1)
     return;
 
@@ -162,7 +162,7 @@ static void handleCalibWrite(SharedState *state, const uint8_t *body, size_t len
   uint8_t success = 0;
 
   if (target == 0) { // IMU
-    state->calibration.imuReq.write(CalibReq{true});
+    robot->imu.calibrate();
     success = 1;
   }
 
@@ -170,7 +170,7 @@ static void handleCalibWrite(SharedState *state, const uint8_t *body, size_t len
   sendPacket(MSG_CALIB_ACK, &ack, sizeof(ack));
 }
 
-static void handleCalibReadReq(SharedState *state, const uint8_t *body, size_t len) {
+static void handleCalibReadReq(Robot *robot, const uint8_t *body, size_t len) {
   if (len != 1)
     return;
 
@@ -178,7 +178,7 @@ static void handleCalibReadReq(SharedState *state, const uint8_t *body, size_t l
   payload.target = body[0];
 
   if (payload.target == 0) { // IMU
-    IMU::Calibration cal = state->calibration.imuData.read();
+    IMU::Calibration cal = robot->imu.calibration();
     memcpy(payload.gyroOffset,  cal.gyro,  sizeof(cal.gyro));
     memcpy(payload.accelOffset, cal.accel, sizeof(cal.accel));
     memcpy(payload.magOffset,   cal.mag,   sizeof(cal.mag));
@@ -191,7 +191,7 @@ static bool isWheelTargetValid(uint8_t target) {
   return target == WHEEL_TARGET_LEFT || target == WHEEL_TARGET_RIGHT;
 }
 
-static void handleWheelCalibCmd(SharedState *state, const uint8_t *body, size_t len) {
+static void handleWheelCalibCmd(Robot *robot, const uint8_t *body, size_t len) {
   if (len != sizeof(WireWheelCalibCmd))
     return;
 
@@ -200,14 +200,7 @@ static void handleWheelCalibCmd(SharedState *state, const uint8_t *body, size_t 
 
   uint8_t success = 0;
   if (isWheelTargetValid(cmd.target)) {
-    CalibReq req;
-    req.pending = true;
-
-    if (cmd.target == WHEEL_TARGET_LEFT) {
-      state->calibration.leftWheelCalibReq.write(req);
-    } else {
-      state->calibration.rightWheelCalibReq.write(req);
-    }
+    robot->wheels.calibrate(); // calibrates both wheels
     success = 1;
   }
 
@@ -215,7 +208,7 @@ static void handleWheelCalibCmd(SharedState *state, const uint8_t *body, size_t 
   sendPacket(MSG_CALIB_ACK, &ack, sizeof(ack));
 }
 
-static void handleWheelCalibReadReq(SharedState *state, const uint8_t *body, size_t len) {
+static void handleWheelCalibReadReq(Robot *robot, const uint8_t *body, size_t len) {
   if (len != 1)
     return;
 
@@ -223,9 +216,8 @@ static void handleWheelCalibReadReq(SharedState *state, const uint8_t *body, siz
   if (!isWheelTargetValid(target))
     return;
 
-  Wheel::Calibration cal = (target == WHEEL_TARGET_LEFT)
-                               ? state->calibration.leftWheelCalibData.read()
-                               : state->calibration.rightWheelCalibData.read();
+  Wheel::Id wheelId = (target == WHEEL_TARGET_LEFT) ? Wheel::Id::Left : Wheel::Id::Right;
+  Wheel::Calibration cal = robot->wheels.calibration(wheelId);
 
   WireWheelCalibData payload{};
   payload.target = target;
@@ -234,7 +226,7 @@ static void handleWheelCalibReadReq(SharedState *state, const uint8_t *body, siz
   sendPacket(MSG_WHEEL_CALIB_DATA, &payload, sizeof(payload));
 }
 
-static void handleWheelTuningWrite(SharedState *state, const uint8_t *body, size_t len) {
+static void handleWheelTuningWrite(Robot *robot, const uint8_t *body, size_t len) {
   if (len != sizeof(WireWheelTuning))
     return;
 
@@ -247,22 +239,16 @@ static void handleWheelTuningWrite(SharedState *state, const uint8_t *body, size
       return v < lo ? lo : (v > hi ? hi : v);
     };
 
-    WheelTuningReq req;
-    req.pending = true;
-    req.persist = msg.persist != 0;
-    req.tuning.p = clamp(msg.p, 0.0f, 20.0f);
-    req.tuning.i = clamp(msg.i, 0.0f, 50.0f);
-    req.tuning.d = clamp(msg.d, 0.0f, 5.0f);
-    req.tuning.output_ramp = clamp(msg.outputRamp, 0.0f, 500.0f);
-    req.tuning.lpf_velocity_tf = clamp(msg.lpfVelocityTf, 0.001f, 0.2f);
-    req.tuning.velocity_limit = clamp(msg.velocityLimit, 1.0f, 80.0f);
-    req.tuning.voltage_limit = clamp(msg.voltageLimit, 0.5f, 12.0f);
+    Wheel::VelocityTuning tuning;
+    tuning.p = clamp(msg.p, 0.0f, 20.0f);
+    tuning.i = clamp(msg.i, 0.0f, 50.0f);
+    tuning.d = clamp(msg.d, 0.0f, 5.0f);
+    tuning.output_ramp = clamp(msg.outputRamp, 0.0f, 500.0f);
+    tuning.lpf_velocity_tf = clamp(msg.lpfVelocityTf, 0.001f, 0.2f);
+    tuning.velocity_limit = clamp(msg.velocityLimit, 1.0f, 80.0f);
+    tuning.voltage_limit = clamp(msg.voltageLimit, 0.5f, 12.0f);
 
-    if (msg.target == WHEEL_TARGET_LEFT) {
-      state->calibration.leftWheelTuningReq.write(req);
-    } else {
-      state->calibration.rightWheelTuningReq.write(req);
-    }
+    robot->wheels.tune(tuning, msg.persist != 0); // tunes both wheels
     success = 1;
   }
 
@@ -270,7 +256,7 @@ static void handleWheelTuningWrite(SharedState *state, const uint8_t *body, size
   sendPacket(MSG_CALIB_ACK, &ack, sizeof(ack));
 }
 
-static void handleWheelTuningReadReq(SharedState *state, const uint8_t *body, size_t len) {
+static void handleWheelTuningReadReq(Robot *robot, const uint8_t *body, size_t len) {
   if (len != 1)
     return;
 
@@ -278,9 +264,8 @@ static void handleWheelTuningReadReq(SharedState *state, const uint8_t *body, si
   if (!isWheelTargetValid(target))
     return;
 
-  Wheel::VelocityTuning tuning = (target == WHEEL_TARGET_LEFT)
-                                     ? state->calibration.leftWheelTuningData.read()
-                                     : state->calibration.rightWheelTuningData.read();
+  Wheel::Id wheelId = (target == WHEEL_TARGET_LEFT) ? Wheel::Id::Left : Wheel::Id::Right;
+  Wheel::VelocityTuning tuning = robot->wheels.tuning(wheelId);
 
   WireWheelTuningData payload{};
   payload.target = target;
@@ -298,7 +283,7 @@ static void handleWheelTuningReadReq(SharedState *state, const uint8_t *body, si
 // Packet dispatcher — called after CRC is verified
 // decoded[0] = type, decoded[1..n-3] = body, decoded[n-2..n-1] = CRC (consumed)
 // ---------------------------------------------------------------------------
-static void dispatch(SharedState *state,
+static void dispatch(Robot *robot,
                      const uint8_t *decoded, size_t decLen,
                      uint32_t &lastDriveTime, uint32_t &lastPoseTime) {
   if (decLen < 3)
@@ -310,35 +295,35 @@ static void dispatch(SharedState *state,
 
   switch (type) {
   case MSG_CMD_DRIVE:
-    handleDriveCmd(state, body, bodyLen);
+    handleDriveCmd(robot, body, bodyLen);
     lastDriveTime = millis();
-    sendDriveTelem(state);
+    sendDriveTelem(robot);
     break;
   case MSG_CMD_POSE:
-    handlePoseCmd(state, body, bodyLen);
+    handlePoseCmd(robot, body, bodyLen);
     lastPoseTime = millis();
-    sendPoseTelem(state);
+    sendPoseTelem(robot);
     break;
   case MSG_STATUS_REQ:
-    handleStatusReq(state, bodyLen);
+    handleStatusReq(robot, bodyLen);
     break;
   case MSG_CALIB_WRITE:
-    handleCalibWrite(state, body, bodyLen);
+    handleCalibWrite(robot, body, bodyLen);
     break;
   case MSG_CALIB_READ_REQ:
-    handleCalibReadReq(state, body, bodyLen);
+    handleCalibReadReq(robot, body, bodyLen);
     break;
   case MSG_WHEEL_CALIB_CMD:
-    handleWheelCalibCmd(state, body, bodyLen);
+    handleWheelCalibCmd(robot, body, bodyLen);
     break;
   case MSG_WHEEL_CALIB_READ_REQ:
-    handleWheelCalibReadReq(state, body, bodyLen);
+    handleWheelCalibReadReq(robot, body, bodyLen);
     break;
   case MSG_WHEEL_TUNING_WRITE:
-    handleWheelTuningWrite(state, body, bodyLen);
+    handleWheelTuningWrite(robot, body, bodyLen);
     break;
   case MSG_WHEEL_TUNING_READ_REQ:
-    handleWheelTuningReadReq(state, body, bodyLen);
+    handleWheelTuningReadReq(robot, body, bodyLen);
     break;
   default:
     break;
@@ -348,7 +333,7 @@ static void dispatch(SharedState *state,
 // ---------------------------------------------------------------------------
 // Frame processing — COBS-decode, verify CRC, dispatch
 // ---------------------------------------------------------------------------
-static void processFrame(SharedState *state,
+static void processFrame(Robot *robot,
                          const uint8_t *raw, size_t rawLen,
                          uint32_t &lastDriveTime, uint32_t &lastPoseTime) {
   static uint8_t decoded[kRxBufSize];
@@ -358,16 +343,16 @@ static void processFrame(SharedState *state,
   uint16_t expected = crc16(decoded, decLen - 2);
   uint16_t received = ((uint16_t)decoded[decLen - 2] << 8) | decoded[decLen - 1];
   if (expected == received)
-    dispatch(state, decoded, decLen, lastDriveTime, lastPoseTime);
+    dispatch(robot, decoded, decLen, lastDriveTime, lastPoseTime);
 }
 
 // ---------------------------------------------------------------------------
 // Task
 // ---------------------------------------------------------------------------
-void commTaskInit(SharedState &state) { Serial.begin(kBaudRate); }
+void commTaskInit(Robot &robot) { Serial.begin(kBaudRate); }
 
 void commTask(void *parameters) {
-  auto state = static_cast<SharedState *>(parameters);
+  auto robot = static_cast<Robot *>(parameters);
 
   static uint8_t rxBuf[kRxBufSize];
   size_t rxLen = 0;
@@ -382,7 +367,7 @@ void commTask(void *parameters) {
 
       if (b == 0x00) {
         if (rxLen > 0) {
-          processFrame(state, rxBuf, rxLen, lastDriveTime, lastPoseTime);
+          processFrame(robot, rxBuf, rxLen, lastDriveTime, lastPoseTime);
           rxLen = 0;
         }
       } else {
@@ -395,9 +380,9 @@ void commTask(void *parameters) {
     // --- Heartbeat: disable actuators if no CMD received ---
     uint32_t now = millis();
     if (now - lastDriveTime > kHeartbeatTimeoutMs)
-      state->commands.wheels.write(WheelsCommand{});
+      robot->wheels.command(WheelSubsystem::Command{});
     if (now - lastPoseTime > kHeartbeatTimeoutMs)
-      state->commands.servos.write(ServosCommand{});
+      robot->servos.command(ServoSubsystem::Command{});
 
     vTaskDelay(pdMS_TO_TICKS(1));
   }

@@ -31,4 +31,5 @@ public:
 private:
   void set_dmp_biases(const IMU::Calibration &cal);  // Internal: write calibration values to DMP
   IMU::Calibration get_dmp_biases();                 // Internal: read calibration values from DMP
+  bool _initialized = false;
 };
