@@ -6,8 +6,13 @@
 class ImuSubsystem {
 public:
   struct Status {
-    byte status;
+    uint8_t status;
     float syncRateHz;
+  };
+
+  struct Telemetry {
+    float roll, pitch, yaw;             // euler angles (rad)
+    float rollRate, pitchRate, yawRate; // angular velocities (rad/s)
   };
 
   enum class State {
@@ -20,7 +25,8 @@ public:
   void calibrate();
 
   Status status();
-  IMU::Data telemetry();
+  Telemetry telemetry();
+  IMU::Data telemetryRaw();
   IMU::Calibration calibration();
 
 private:
@@ -28,7 +34,8 @@ private:
 
   Protected<State> _state;
   Protected<Status> _status;
-  Protected<IMU::Data> _telemetry;
+  Protected<Telemetry> _telemetry;
+  Protected<IMU::Data> _telemetryRaw;
   Protected<IMU::Calibration> _calibration;
 
   IMU _imu;

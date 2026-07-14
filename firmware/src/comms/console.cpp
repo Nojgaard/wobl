@@ -1,0 +1,245 @@
+#include "comms/console.hpp"
+#include <Arduino.h>
+
+static void _skipSpace(char **p) {
+  while (**p == ' ' || **p == '\n' || **p == '\r')
+    (*p)++;
+}
+
+// -------------------------------------------------------------------
+// Static member definitions
+// -------------------------------------------------------------------
+
+Robot *Console::_robot = nullptr;
+Commander Console::_commander(Serial);
+
+// -------------------------------------------------------------------
+// Public API
+// -------------------------------------------------------------------
+
+Console::Console(Robot *robot) { _robot = robot; }
+
+void Console::init() {
+  _commander.add('s', _cmdStatus, "status");
+  _commander.add('g', _cmdControllerConfig, "config control [p|r|v|x|o][=val]");
+  _commander.add('t', _cmdWheelConfig, "config wheel [p|i|d|f][=val]");
+  _commander.add('e', _cmdEnable, "enable [0|1]");
+  _commander.add('w', _cmdWheel, "drive [vel]");
+  _commander.add('c', _cmdCalibrate, "calibrate [i|w]");
+  _commander.add('i', _cmdImu, "imu telemetry");
+
+  Serial.println("Console ready. Type '?' for commands.");
+}
+
+void Console::update() { _commander.run(); }
+
+// ===================================================================
+// Command: s — Status
+// ===================================================================
+
+void Console::_cmdStatus(char *arg) {
+  _skipSpace(&arg);
+  auto &r = *_robot;
+
+  auto is = r.imu.status();
+  auto ws = r.wheels.status();
+  auto ss = r.servos.status();
+
+  Serial.printf("IMU   status=%i sync=%.0fHz\n", is.status, is.syncRateHz);
+  Serial.printf("WHEEL status=[L=%i R=%i] sync=%.0fHz update=%.0fHz\n", ws.left,
+                ws.right, ws.syncRateHz, ws.updateRateHz);
+  Serial.printf("SERVO status=[L=%i R=%i] cmdSync=%.0fHz telSync=%.0fHz\n",
+                ss.left, ss.right, ss.cmdSyncRateHz, ss.telSyncRateHz);
+}
+
+// ===================================================================
+// Command: g — ControllerConfig
+// ===================================================================
+
+void Console::_cmdControllerConfig(char *arg) {
+  _skipSpace(&arg);
+  auto cfg = _robot->controller.config();
+
+  if (*arg == '\0') {
+    Serial.printf("pitchKp=%.3f  pitchRateKp=%.3f  "
+                  "velKp=%.3f  posKp=%.3f  offset=%.3f\n",
+                  cfg.pitchKp, cfg.pitchRateKp, cfg.velocityKp, cfg.positionKp,
+                  cfg.pitchOffset);
+    return;
+  }
+
+  float v;
+  bool set = false;
+
+  if (sscanf(arg, "p=%f", &v) == 1) {
+    Serial.printf("pitchKp:     %.3f -> %.3f\n", cfg.pitchKp, v);
+    cfg.pitchKp = v;
+    set = true;
+  } else if (sscanf(arg, "r=%f", &v) == 1) {
+    Serial.printf("pitchRateKp: %.3f -> %.3f\n", cfg.pitchRateKp, v);
+    cfg.pitchRateKp = v;
+    set = true;
+  } else if (sscanf(arg, "v=%f", &v) == 1) {
+    Serial.printf("velKp:       %.3f -> %.3f\n", cfg.velocityKp, v);
+    cfg.velocityKp = v;
+    set = true;
+  } else if (sscanf(arg, "x=%f", &v) == 1) {
+    Serial.printf("posKp:       %.3f -> %.3f\n", cfg.positionKp, v);
+    cfg.positionKp = v;
+    set = true;
+  } else if (sscanf(arg, "o=%f", &v) == 1) {
+    Serial.printf("offset:      %.3f -> %.3f\n", cfg.pitchOffset, v);
+    cfg.pitchOffset = v;
+    set = true;
+  } else {
+    Serial.printf("Unknown: '%s'. Try p=val r=val v=val x=val o=val\n", arg);
+    return;
+  }
+
+  if (set)
+    _robot->controller.config(cfg);
+}
+
+// ===================================================================
+// Command: t — WheelConfig
+// ===================================================================
+
+void Console::_cmdWheelConfig(char *arg) {
+  _skipSpace(&arg);
+
+  // No arg → print both wheels
+  if (*arg == '\0') {
+    auto tL = _robot->wheels.tuning(Wheel::Id::Left);
+    auto tR = _robot->wheels.tuning(Wheel::Id::Right);
+    Serial.printf("Left:  p=%.4f  i=%.4f  d=%.4f  f=%.4f\n", tL.p, tL.i, tL.d,
+                  tL.lpf_velocity_tf);
+    Serial.printf("Right: p=%.4f  i=%.4f  d=%.4f  f=%.4f\n", tR.p, tR.i, tR.d,
+                  tR.lpf_velocity_tf);
+    return;
+  }
+
+  // Param
+  auto t = _robot->wheels.tuning(Wheel::Id::Left);
+  float v;
+
+  if (sscanf(arg, "p=%f", &v) == 1) {
+    Serial.printf("P: %.4f -> %.4f\n", t.p, v);
+    t.p = v;
+  } else if (sscanf(arg, "i=%f", &v) == 1) {
+    Serial.printf("I: %.4f -> %.4f\n", t.i, v);
+    t.i = v;
+  } else if (sscanf(arg, "d=%f", &v) == 1) {
+    Serial.printf("D: %.4f -> %.4f\n", t.d, v);
+    t.d = v;
+  } else if (sscanf(arg, "f=%f", &v) == 1) {
+    Serial.printf("LPF: %.4f -> %.4f\n", t.lpf_velocity_tf, v);
+    t.lpf_velocity_tf = v;
+  } else {
+    Serial.printf("Unknown: '%s'. Try p=val i=val d=val f=val\n", arg);
+    return;
+  }
+
+  _robot->wheels.tune(t, false);
+}
+
+// ===================================================================
+// Command: e — Enable
+// ===================================================================
+
+void Console::_cmdEnable(char *arg) {
+  _skipSpace(&arg);
+
+  if (*arg == '\0') {
+    auto cmd = _robot->controller.command();
+    Serial.printf("Controller %s\n", cmd.enable ? "ENABLED" : "DISABLED");
+    return;
+  }
+
+  if (strcmp(arg, "0") == 0) {
+    _robot->controller.command({false, 0.0f, 0.0f});
+    Serial.println("Controller DISABLED");
+  } else if (strcmp(arg, "1") == 0) {
+    _robot->controller.command({true, 0.0f, 0.0f});
+    Serial.println("Controller ENABLED");
+  } else {
+    Serial.printf("Expected 0 or 1, got '%s'\n", arg);
+  }
+}
+
+// ===================================================================
+// Command: w — Wheel passthrough
+// ===================================================================
+
+void Console::_cmdWheel(char *arg) {
+  _skipSpace(&arg);
+
+  // Safety: passthrough only when controller is off
+  if (_robot->controller.command().enable) {
+    Serial.println(
+        "Controller enabled - refusing passthrough. Disable with 'e0' first.");
+    return;
+  }
+
+  if (*arg == '\0') {
+    auto tel = _robot->wheels.telemetry();
+    Serial.printf("Left:  %.2f rad/s\n", tel.left.velocity);
+    Serial.printf("Right: %.2f rad/s\n", tel.right.velocity);
+    return;
+  }
+
+  float vel;
+  WheelSubsystem::Command cmd{};
+
+  if (sscanf(arg, "%f", &vel) == 1) {
+    cmd.left = {true, vel};
+    cmd.right = {true, vel};
+    _robot->wheels.command(cmd);
+    Serial.printf("Drive: %.2f rad/s\n", vel);
+  } else {
+    Serial.printf("Unknown: '%s'. Try '5.0' or '3.0'\n", arg);
+  }
+}
+
+// ===================================================================
+// Command: c — Calibrate
+// ===================================================================
+
+void Console::_cmdCalibrate(char *arg) {
+  _skipSpace(&arg);
+
+  if (*arg == '\0') {
+    auto imuCal = _robot->imu.calibration();
+    auto wCalL = _robot->wheels.calibration(Wheel::Id::Left);
+    auto wCalR = _robot->wheels.calibration(Wheel::Id::Right);
+    Serial.printf(
+        "IMU   gyro=(%ld,%ld,%ld) accel=(%ld,%ld,%ld) mag=(%ld,%ld,%ld)\n",
+        (long)imuCal.gyro[0], (long)imuCal.gyro[1], (long)imuCal.gyro[2],
+        (long)imuCal.accel[0], (long)imuCal.accel[1], (long)imuCal.accel[2],
+        (long)imuCal.mag[0], (long)imuCal.mag[1], (long)imuCal.mag[2]);
+    Serial.printf("WHEEL L angle=%.3f dir=%d  R angle=%.3f dir=%d\n",
+                  wCalL.zero_electric_angle, (int)wCalL.sensor_direction,
+                  wCalR.zero_electric_angle, (int)wCalR.sensor_direction);
+    return;
+  }
+
+  if (strcmp(arg, "i") == 0) {
+    Serial.println("Calibrating IMU...");
+    _robot->imu.calibrate();
+    Serial.println("IMU calibration done.");
+  } else if (strcmp(arg, "w") == 0) {
+    Serial.println("Calibrating wheels...");
+    _robot->wheels.calibrate();
+    Serial.println("Wheel calibration done.");
+  } else {
+    Serial.printf("Unknown: '%s'. Try: i w\n", arg);
+  }
+}
+
+// ===================================================================
+// Command: i — Imu
+// ===================================================================
+
+void Console::_cmdImu(char *arg) {
+    auto imu = _robot->imu.telemetry();
+    Serial.printf("r=%.3f p=%.3f y=%.3f\n", imu.roll, imu.pitch, imu.yaw);
+}

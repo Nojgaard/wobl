@@ -62,6 +62,8 @@ CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE=n
 # Brings too many issues with Arduino users. Disable it by default.
 # Can be enabled via API.
 CONFIG_BLUEPAD32_ENABLE_VIRTUAL_DEVICE_BY_DEFAULT=n
+# Has to be "n" to allow DS4 to reconnect.
+CONFIG_BLUEPAD32_GAP_SECURITY=n
 
 #
 # Arduino Options

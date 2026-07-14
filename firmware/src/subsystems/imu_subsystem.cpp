@@ -5,6 +5,22 @@ static constexpr uint8_t kCSPin = 5;
 
 static constexpr long kStatusIntervalMs = 500;
 
+ImuSubsystem::Telemetry toTelemetry(const IMU::Data &data) {
+  float qx = data.orientation[0];
+  float qy = data.orientation[1];
+  float qz = data.orientation[2];
+  float qw = data.orientation[3];
+
+  return ImuSubsystem::Telemetry{
+      .roll = atan2f(2 * (qw * qx + qy * qz), 1 - 2 * (qx * qx + qy * qy)),
+      .pitch = asinf(2 * (qw * qy - qz * qx)),
+      .yaw = atan2f(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz)),
+      .rollRate = data.gyr[0],
+      .pitchRate = data.gyr[1],
+      .yawRate = data.gyr[2],
+  };
+}
+
 void ImuSubsystem::init() {
   bool spiSuccess = SPI.begin();
   if (!spiSuccess) {
@@ -16,7 +32,7 @@ void ImuSubsystem::init() {
   Status status;
   status.status = _imu.initialize(SPI, kCSPin);
   _status.write(status);
-  
+
   if (status.status != 1) {
     DPRINTF("Failed to initialize IMU: %d", status.status);
     return;
@@ -39,7 +55,8 @@ void ImuSubsystem::update() {
   IMU::Data data;
   if (_imu.try_read(data)) {
     _readsSinceLastSync++;
-    _telemetry.write(data);
+    _telemetryRaw.write(data);
+    _telemetry.write(toTelemetry(data));
   }
 
   long now = millis();
@@ -86,6 +103,8 @@ void ImuSubsystem::loop() {
 
 ImuSubsystem::Status ImuSubsystem::status() { return _status.read(); }
 
-IMU::Data ImuSubsystem::telemetry() { return _telemetry.read(); }
+IMU::Data ImuSubsystem::telemetryRaw() { return _telemetryRaw.read(); }
+
+ImuSubsystem::Telemetry ImuSubsystem::telemetry() { return _telemetry.read(); }
 
 IMU::Calibration ImuSubsystem::calibration() { return _calibration.read(); }

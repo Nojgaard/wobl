@@ -80,7 +80,7 @@ static void handleDriveCmd(Robot *robot, const uint8_t *body,
 }
 
 static void sendDriveTelem(Robot *robot) {
-  IMU::Data imu = robot->imu.telemetry();
+  IMU::Data imu = robot->imu.telemetryRaw();
   WheelSubsystem::Telemetry wheels = robot->wheels.telemetry();
 
   WireDriveTelem telem;
