@@ -121,6 +121,7 @@ void Console::_cmdWheelConfig(char *arg) {
   // Param
   auto t = _robot->wheels.tuning(Wheel::Id::Left);
   float v;
+  bool persist = false;
 
   if (sscanf(arg, "p=%f", &v) == 1) {
     Serial.printf("P: %.4f -> %.4f\n", t.p, v);
@@ -134,12 +135,15 @@ void Console::_cmdWheelConfig(char *arg) {
   } else if (sscanf(arg, "f=%f", &v) == 1) {
     Serial.printf("LPF: %.4f -> %.4f\n", t.lpf_velocity_tf, v);
     t.lpf_velocity_tf = v;
+  } else if (arg[0] == 's') {
+    persist = true;
+    Serial.println("Persisting tuning to NVS");
   } else {
     Serial.printf("Unknown: '%s'. Try p=val i=val d=val f=val\n", arg);
     return;
   }
 
-  _robot->wheels.tune(t, false);
+  _robot->wheels.tune(t, persist);
 }
 
 // ===================================================================
@@ -155,12 +159,10 @@ void Console::_cmdEnable(char *arg) {
     return;
   }
 
-  if (strcmp(arg, "0") == 0) {
-    _robot->controller.command({false, 0.0f, 0.0f});
-    Serial.println("Controller DISABLED");
-  } else if (strcmp(arg, "1") == 0) {
-    _robot->controller.command({true, 0.0f, 0.0f});
-    Serial.println("Controller ENABLED");
+  int enable;
+  if (sscanf(arg, "%d", &enable) == 1) {
+    _robot->controller.command({static_cast<bool>(enable), 0.0f, 0.0f});
+    Serial.printf("Controller %s\n", enable ? "ENABLED" : "DISABLED");
   } else {
     Serial.printf("Expected 0 or 1, got '%s'\n", arg);
   }

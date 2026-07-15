@@ -109,12 +109,12 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
   }
 
   int status = 1;
-  _sensor.min_elapsed_time = 0.005f; // 5 ms = 200 Hz update rate
+  _sensor.min_elapsed_time = 0.010f; // 10 ms = 100 Hz update rate
   _sensor.init(&wire);
 
   _motor.foc_modulation = FOCModulationType::SpaceVectorPWM;
   _motor.linkSensor(&_sensor);
-  _motor.current_limit = 1.0f;
+  _motor.current_limit = 1.5f;
 
   _driver.voltage_power_supply = voltage_supply;
   _driver.voltage_limit = voltage_limit;
@@ -232,7 +232,6 @@ void Wheel::command(bool enabled, float velocity) {
 void addFeedForwardEffects(BLDCMotor &motor, const Wheel::Command &command) {
   float ffVoltage = 0.0f;
 
-  // Coulomb friction
   constexpr float kCoulombV = 0.3f;
   constexpr float kCoulombRamp = 0.5f;
   float absCmd = fabsf(command.velocity);
@@ -240,12 +239,21 @@ void addFeedForwardEffects(BLDCMotor &motor, const Wheel::Command &command) {
       (absCmd < kCoulombRamp) ? kCoulombV * (absCmd / kCoulombRamp) : kCoulombV;
   ffVoltage += (command.velocity >= 0) ? mag : -mag;
 
-  // Velocity feedforward
-  /*float kffVel = 0.3f;
-  float ffVelCurrent = kffVel * command.velocity;
-  ffVoltage += ffVelCurrent;*/
 
   motor.feed_forward_voltage.q = ffVoltage;
+}
+
+void gainSchedulePID(BLDCMotor &motor, const Wheel::Command &command,
+                     const Wheel::VelocityTuning &tuning) {
+  constexpr float kScheduleThreshold = 0.5f; // rad/s
+  constexpr float kLowSpeedP = 0.15f;         // reduced P at standstill
+
+  float absCmd = fabsf(command.velocity);
+  float blend = (absCmd < kScheduleThreshold)
+                    ? absCmd / kScheduleThreshold
+                    : 1.0f; // 0 = full low-speed, 1 = full normal
+
+  motor.PID_velocity.P = kLowSpeedP + blend * (tuning.p - kLowSpeedP);
 }
 
 void Wheel::update() {
@@ -255,27 +263,9 @@ void Wheel::update() {
   if (!isOk())
     return;
 
-  // Gain scheduling: at low command velocities, encoder quantization noise
-  // dominates.  Blend toward a heavier LPF and lower P to suppress audible
-  // vibration, then ramp back to the normal tuning for tracking at speed.
-  constexpr float kScheduleThreshold = 0.5f;   // rad/s
-  constexpr float kLowSpeedP = 0.15f;           // reduced P at standstill
-  //constexpr float kLowSpeedRamp = 1.0f;
-
-  float absCmd = fabsf(_command.velocity);
-  float blend = (absCmd < kScheduleThreshold)
-                    ? absCmd / kScheduleThreshold
-                    : 1.0f; // 0 = full low-speed, 1 = full normal
-
-  _motor.PID_velocity.P = kLowSpeedP + blend * (_tuning.p - kLowSpeedP);
-  //_motor.PID_velocity.output_ramp =
-  //    kLowSpeedRamp + blend * (_tuning.output_ramp - kLowSpeedRamp);
-  
-  //_motor.LPF_velocity.Tf =
-  //    _tuning.lpf_velocity_tf +
-  //    (1.0f - blend) * (kLowSpeedLpfTf - _tuning.lpf_velocity_tf);
-
+  gainSchedulePID(_motor, _command, _tuning);
   addFeedForwardEffects(_motor, _command);
+
   _motor.loopFOC();
   _motor.move(_command.velocity);
 
