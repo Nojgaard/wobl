@@ -69,6 +69,12 @@ class ControllerLoop:
         self._controller.cmd_fwd_velocity.update(fwd_velocity)
         self._controller.cmd_yaw_rate.update(yaw_rate)
 
+    def reset_velocity_target(self) -> None:
+        """Reset the target forward velocity and yaw rate to zero."""
+        self._controller.cmd_fwd_velocity.value = 0.0
+        self._controller.cmd_yaw_rate.value = 0.0
+        self._controller.integral_error = 0.0
+
     def set_pose(self, left_pos_rad: float, right_pos_rad: float) -> None:
         """Update the servo position targets (rad)."""
         self._pose_cmd = PoseCommand(

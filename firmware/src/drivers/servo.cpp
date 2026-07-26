@@ -55,6 +55,12 @@ void Servo::update() {
       stepsToRadians(_bus->ReadPos(-1) - STEPS_PER_REVOLUTION / 2);
   _data.velocityRps = _config.coordSign * stepsToRadians(_bus->ReadSpeed(-1));
   _data.effortPct = _bus->ReadLoad(-1) * 0.1f;
+  
+  _voltage = _bus->ReadVoltage(-1) * 0.1f;
+}
+
+float Servo::voltage() const {
+  return _voltage;
 }
 
 bool Servo::calibrate() {

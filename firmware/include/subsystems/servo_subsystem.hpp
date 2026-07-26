@@ -9,6 +9,7 @@ public:
     float telSyncRateHz;
     byte left;
     byte right;
+    float voltage;
   };
 
   struct Command {

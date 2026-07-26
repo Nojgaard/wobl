@@ -41,9 +41,12 @@ WheelSubsystem::Command MotionController::balance(const Command &cmdBody, float 
   if (!cmdBody.enable)
     return WheelSubsystem::Command{};
 
+  float targetFwdVel = _targetFwdVelLPF(cmdBody.forwardVelocity);
+  float targetTurnVel = _targetTurnVelLPF(cmdBody.turnVelocity);
+
   float pitchError = _pitch - cfg.pitchOffset;
   float pitchRateError = _pitchRate.value();
-  float velocityError = _forwardVelocity.value() - cmdBody.forwardVelocity;
+  float velocityError = _forwardVelocity.value() - targetFwdVel;
 
   _positionError += velocityError * dt;
   _positionError = std::clamp(_positionError, -0.3f, 0.3f);
@@ -53,7 +56,7 @@ WheelSubsystem::Command MotionController::balance(const Command &cmdBody, float 
   ctrlFwdVel -= cfg.positionKp * _positionError;
   ctrlFwdVel -= cfg.velocityKp * velocityError;
 
-  float ctrlTurnVel = cmdBody.turnVelocity;
+  float ctrlTurnVel = targetTurnVel;
 
   auto ctrlWheelVel = DiffDriveKinematics::toWheelVel(ctrlFwdVel, ctrlTurnVel);
   return WheelSubsystem::Command{

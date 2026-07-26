@@ -50,6 +50,7 @@ void Console::_cmdStatus(char *arg) {
                 ws.right, ws.syncRateHz, ws.updateRateHz);
   Serial.printf("SERVO status=[L=%i R=%i] cmdSync=%.0fHz telSync=%.0fHz\n",
                 ss.left, ss.right, ss.cmdSyncRateHz, ss.telSyncRateHz);
+  Serial.printf("BATT  volt=%.2fV\n", ss.voltage);
 }
 
 // ===================================================================

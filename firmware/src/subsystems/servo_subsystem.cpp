@@ -76,6 +76,13 @@ void ServoSubsystem::syncTelemetry() {
 
   Status status = _status.read();
   status.telSyncRateHz = 1000.0 / (now - _lastFeedbackTime);
+
+  if (_leftHip.data().valid && _rightHip.data().valid) {
+    status.voltage = (_leftHip.voltage() + _rightHip.voltage()) / 2.0f;
+  } else {
+    status.voltage = 0.0f;
+  }
+
   _status.write(status);
 
   _lastFeedbackTime = now;

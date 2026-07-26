@@ -10,7 +10,11 @@ public:
   void update();
 
 private:
-  bool pressedStart = false;
+  bool _enableController = false;
+  float _targetFwdVel = 0.0f;
+  float _targetTurnVel = 0.0f;
+
+  bool _pressedStart = false;
 
   Robot& _robot;
 };

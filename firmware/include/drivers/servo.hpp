@@ -27,6 +27,7 @@ public:
   bool init(SMS_STS &bus);
   void update();
   const Data &data() const;
+  float voltage() const;
   void command(const Command &cmd);
   bool calibrate();
 
@@ -43,4 +44,5 @@ private:
   Data _data;
   bool _enabled;
   int _lastWrittenSteps;
+  float _voltage = 0.0f;
 };

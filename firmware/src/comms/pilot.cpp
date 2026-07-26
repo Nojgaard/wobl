@@ -4,6 +4,19 @@
 
 static ControllerPtr gamepad = nullptr;
 
+static constexpr float AXIS_DEADZONE = 30;
+static constexpr float AXIS_MAX = 520;
+
+static constexpr float MAX_FWD_VEL = 0.2f;  // m/s
+static constexpr float MAX_TURN_VEL = 0.5f; // rad/s
+
+float normalizeAxis(int32_t value) {
+  if (abs(value) < AXIS_DEADZONE) {
+    return 0.0f;
+  }
+  return (float)value / AXIS_MAX;
+}
+
 bool hasData() {
   return gamepad && gamepad->isConnected() && gamepad->hasData();
 }
@@ -27,7 +40,7 @@ void Pilot::init() {
                 addr[3], addr[4], addr[5]);
 
   BP32.setup(&onConnectedController, &onDisconnectedController, true);
-  //BP32.forgetBluetoothKeys();
+  // BP32.forgetBluetoothKeys();
   BP32.enableVirtualDevice(false);
 }
 
@@ -36,17 +49,24 @@ void Pilot::update() {
     return;
   }
 
-  if (pressedStart && !gamepad->miscStart()) {
-    bool enable = !(_robot.controller.command().enable);
-    _robot.controller.command({enable, 0.0f, 0.0f});
-    Serial.printf("Controller %s\n", enable ? "ENABLED" : "DISABLED");
+  if (_pressedStart && !gamepad->miscStart()) {
+    _enableController = !(_robot.controller.command().enable);
+    Serial.printf("Controller %s\n",
+                  _enableController ? "ENABLED" : "DISABLED");
   }
+  _pressedStart = gamepad->miscStart();
 
-  pressedStart = gamepad->miscStart();
+  _targetFwdVel = normalizeAxis(-gamepad->axisY()) * MAX_FWD_VEL;
+  _targetTurnVel = normalizeAxis(gamepad->axisRX()) * MAX_TURN_VEL;
+
+  _robot.controller.command({.enable = _enableController,
+                             .forwardVelocity = _targetFwdVel,
+                             .turnVelocity = _targetTurnVel});
 
   /*Serial.printf("buttons: 0x%04x, axis L: %4d, %4d, "
                 "axis R: %4d, %4d, start: 0x%04x, sel: 0x%04x\n",
                 gamepad->buttons(),
                 gamepad->axisX(), gamepad->axisY(), gamepad->axisRX(),
-                gamepad->axisRY(), gamepad->miscStart(), gamepad->miscSelect());*/
+                gamepad->axisRY(), gamepad->miscStart(),
+     gamepad->miscSelect());*/
 }

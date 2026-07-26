@@ -34,8 +34,9 @@ class Controller:
         self.fwd_velocity_raw = 0.0  # for logging/debugging only; not used in control
         # self.fwd_velocity = LinearFilter(0.05, 0.0)
 
-        self.cmd_fwd_velocity = LinearFilter(0.2, 0.0)
-        self.cmd_yaw_rate = LinearFilter(0.2, 0.0)
+        self.cmd_fwd_velocity = LinearFilter(0.05, 0.0)
+        self.cmd_yaw_rate = LinearFilter(0.05, 0.0)
+        self._prev_cmd_fwd_velocity = 0.0
 
         self.ctrl_velocity = 0.0
         self.ctrl_yaw_rate = 0.0
@@ -44,7 +45,10 @@ class Controller:
         self.last_right_vel = 0.0
         self.max_vel_rate = 40.0  # rad/s² - tune this based on testing
 
-        self.diff_drive = DiffDriveKinematics(0.3, 0.04, 20.0)
+        self.diff_drive = DiffDriveKinematics(0.3, 0.04, 40.0)
+        self.cmd_accel_filter = LinearFilter(
+            0.03, 0.0
+        )  # τ ≈ 220ms at 150Hz — tune this
 
     def update_drive_telem(self, telem: DriveTelemetry) -> None:
         if sum(telem.quat_xyzw) == 0.0:
@@ -74,7 +78,13 @@ class Controller:
         cmd_fwd_velocity = self.cmd_fwd_velocity.value
         cmd_yaw_rate = self.cmd_yaw_rate.value
 
-        pitch = self.pitch - self.offset_pitch
+        cmd_accel_raw = (cmd_fwd_velocity - self._prev_cmd_fwd_velocity) / self._dt
+        self.cmd_accel_filter.update(cmd_accel_raw)
+        cmd_accel = self.cmd_accel_filter.value
+        self._prev_cmd_fwd_velocity = cmd_fwd_velocity
+
+        pitch_ref = self.offset_pitch + cmd_accel / 9.81
+        pitch = self.pitch - pitch_ref
         pitch_rate = self.pitch_rate.value
 
         fwd_velocity = self.fwd_velocity.value - cmd_fwd_velocity

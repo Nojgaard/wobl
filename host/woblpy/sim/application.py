@@ -25,6 +25,7 @@ class Application:
         self._state = State.RUNNING
         self._policy = policy
         self._physics: Physics = cast(Physics, self._env.physics)
+        self.custom_key_callback: Callable[[int], None] | None = None
         self.running = True
 
     def _step(self):
@@ -63,6 +64,9 @@ class Application:
             self._state = (
                 State.RUNNING if self._state == State.STOPPED else State.STOPPED
             )
+
+        if self.custom_key_callback is not None:
+            self.custom_key_callback(key)
 
     def launch_headless(self):
         """Launch the application in headless mode."""

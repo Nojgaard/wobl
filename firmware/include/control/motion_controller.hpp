@@ -6,6 +6,7 @@
 #include "subsystems/imu_subsystem.hpp"
 #include "subsystems/servo_subsystem.hpp"
 #include "subsystems/wheel_subsystem.hpp"
+#include <SimpleFOC.h>
 
 class MotionController {
 public:
@@ -74,6 +75,9 @@ private:
   LinearFilter _pitchRate{0.1f, 0.0f};
   KalmanFilter _forwardVelocity{2.0f, 0.25f};
   KalmanFilter _turnVelocity{2.0f, 0.25f};
+
+  LowPassFilter _targetFwdVelLPF { 0.1f };
+  LowPassFilter _targetTurnVelLPF { 0.1f };
 
   float _positionError = 0.0f;
   unsigned long _lastUpdateTimeMs = 0;
