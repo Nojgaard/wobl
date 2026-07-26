@@ -11,13 +11,17 @@ static void _skipSpace(char **p) {
 // -------------------------------------------------------------------
 
 Robot *Console::_robot = nullptr;
+Broadcaster* Console::_broadcaster = nullptr;
 Commander Console::_commander(Serial);
 
 // -------------------------------------------------------------------
 // Public API
 // -------------------------------------------------------------------
 
-Console::Console(Robot *robot) { _robot = robot; }
+Console::Console(Robot *robot, Broadcaster* broadcaster) {
+  _robot = robot;
+  _broadcaster = broadcaster;
+}
 
 void Console::init() {
   _commander.add('s', _cmdStatus, "status");
@@ -27,6 +31,7 @@ void Console::init() {
   _commander.add('w', _cmdWheel, "drive [vel]");
   _commander.add('c', _cmdCalibrate, "calibrate [i|w]");
   _commander.add('i', _cmdImu, "imu telemetry");
+  _commander.add('b', _cmdEnableTelemetry, "enable telemetry [0|1]");
 
   Serial.println("Console ready. Type '?' for commands.");
 }
@@ -245,4 +250,16 @@ void Console::_cmdCalibrate(char *arg) {
 void Console::_cmdImu(char *arg) {
     auto imu = _robot->imu.telemetry();
     Serial.printf("r=%.3f p=%.3f y=%.3f\n", imu.roll, imu.pitch, imu.yaw);
+}
+
+void Console::_cmdEnableTelemetry(char *arg) {
+  _skipSpace(&arg);
+
+  int enable;
+  if (sscanf(arg, "%d", &enable) == 1) {
+    _broadcaster->enable(static_cast<bool>(enable));
+    Serial.printf("Telemetry %s\n", enable ? "ENABLED" : "DISABLED");
+  } else {
+    Serial.printf("Expected 0 or 1, got '%s'\n", arg);
+  }
 }

@@ -39,7 +39,7 @@ void Pilot::init() {
   Serial.printf("BD Addr: %2X:%2X:%2X:%2X:%2X:%2X\n", addr[0], addr[1], addr[2],
                 addr[3], addr[4], addr[5]);
 
-  BP32.setup(&onConnectedController, &onDisconnectedController, true);
+  BP32.setup(&onConnectedController, &onDisconnectedController, false);
   // BP32.forgetBluetoothKeys();
   BP32.enableVirtualDevice(false);
 }

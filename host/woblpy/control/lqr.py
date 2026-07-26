@@ -3,6 +3,44 @@ import numpy as np
 
 
 def compute_lqr_gains():
+    # sourced from https://blog.pictor.us/lqr-control-of-a-self-balancing-robot/
+    m = 1.2  # mass of the robot (kg)
+    L = 0.06  # distance from wheel axle to center of mass (m)
+    g = 9.81  # acceleration due to gravity (m/s^2)
+    r = 0.04  # radius of the wheels (m)
+
+    # State vector: [x, x_dot, theta, theta_dot]
+    A = np.array(
+        [
+            [0, 1, 0, 0],  #     position
+            [0, 0, g, 0],  #     velocity
+            [0, 0, 0, 1],  #     angle
+            [0, 0, g / L, 0],  # angular velocity
+        ]
+    )
+    B = np.array([[0], [1 / (m * r)], [0], [-1 / (m * L * r)]])
+
+    Q = np.diag(
+        [
+            1.0,  # x          (prefer to stay in place)
+            1.5,  # x_dot      (do not run away)
+            3.0,  # theta      (most important: avoid falling)
+            0.2,  # theta_dot  (reduce fast tipping)
+        ]
+    )
+
+    # R penalizes the control effort (wheel torque).
+    # Larger R → less aggressive control (reduced torque usage).
+    R = np.array([[1.0]])
+
+    K, _, _ = control.lqr(A, B, Q, R)
+    K = K[0]
+
+    # [k_pitch, k_pitch_rate, k_velocity, k_position]
+    return np.array([K[2], K[3], K[1], K[0]])
+
+
+def compute_lqr_gains_old():
     """Compute LQR gains for a self-balancing, two-wheeled biped robot.
 
     This function calculates the LQR controller gains for a simplified
@@ -16,18 +54,18 @@ def compute_lqr_gains():
     #
     # Masses from robot.xml: total ~1.2 kg, wheels 0.061 kg each.
 
-    m_b = 1.078              # Body mass above axle = total - 2×wheel (kg)
-    m_w = 0.061              # Single wheel mass (kg)
+    m_b = 1.078  # Body mass above axle = total - 2×wheel (kg)
+    m_w = 0.061  # Single wheel mass (kg)
     com_length = 0.06089132455005064  # Height of CoM above wheel axle (m)
-    gravity = 9.80665        # Acceleration due to gravity (m/s²)
-    wheel_radius = 0.04      # Radius of the wheels (m)
+    gravity = 9.80665  # Acceleration due to gravity (m/s²)
+    wheel_radius = 0.04  # Radius of the wheels (m)
 
     # ---- Derived quantities ----
-    I_b = 0.0                # Body moment of inertia about own CoM (point-mass approx)
+    I_b = 0.0  # Body moment of inertia about own CoM (point-mass approx)
     I_w = 0.5 * m_w * wheel_radius**2  # Wheel moment of inertia (solid disk approx)
-    I_axle = I_b + m_b * com_length**2   # Body inertia about wheel axle (parallel axis)
-    M_eff = m_b + 2*m_w + 2*I_w / wheel_radius**2  # Effective translational mass
-    Delta = I_axle * M_eff - (m_b * com_length)**2  # Coupling determinant (>0)
+    I_axle = I_b + m_b * com_length**2  # Body inertia about wheel axle (parallel axis)
+    M_eff = m_b + 2 * m_w + 2 * I_w / wheel_radius**2  # Effective translational mass
+    Delta = I_axle * M_eff - (m_b * com_length) ** 2  # Coupling determinant (>0)
 
     # ---- Continuous-Time State-Space Model ----
     #
@@ -55,17 +93,17 @@ def compute_lqr_gains():
 
     A = np.array(
         [
-            [0, 1, 0],      # d(θ)/dt = θ̇
-            [a_21, 0, 0],   # θ̈  (>0, gravity amplifies tilt)
-            [a_31, 0, 0],   # v̇  (<0, forward tilt pushes wheels back)
+            [0, 1, 0],  # d(θ)/dt = θ̇
+            [a_21, 0, 0],  # θ̈  (>0, gravity amplifies tilt)
+            [a_31, 0, 0],  # v̇  (<0, forward tilt pushes wheels back)
         ]
     )
 
     B = np.array(
         [
-            [0],            # τ does not directly affect θ
-            [b_21],         # θ̈ contribution  (<0, torque tilts body backward)
-            [b_31],         # v̇ contribution   (>0, torque accelerates robot forward)
+            [0],  # τ does not directly affect θ
+            [b_21],  # θ̈ contribution  (<0, torque tilts body backward)
+            [b_31],  # v̇ contribution   (>0, torque accelerates robot forward)
         ]
     )
 
@@ -90,7 +128,7 @@ def compute_lqr_gains():
 
     # R penalizes the control effort (wheel torque).
     # Larger R → less aggressive control (reduced torque usage).
-    R = np.array([[1.5]])
+    R = np.array([[0.5]])
 
     # ---- Integral Action ----
     #

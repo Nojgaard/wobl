@@ -20,6 +20,11 @@ public:
     float turnVelocity;
   };
 
+  struct ControlOutput {
+    WheelSubsystem::Command wheels;
+    ServoSubsystem::Command servos;
+  };
+
   struct Telemetry {
     float pitch;
     float pitchRate;
@@ -27,7 +32,16 @@ public:
     float roll;
     float rollRate;
 
+    // Raw input velocities from the wheels, in rad/s
+    WheelVelocity wheelVel;
+
+    // Processed body velocities from the wheels, in m/s and rad/s
     BodyVelocity bodyVel;
+
+    // Target body velocities from pilot, in m/s and rad/s
+    BodyVelocity targetBodyVel;
+
+    ControlOutput output;
   };
 
   struct Config {
@@ -37,11 +51,6 @@ public:
     float pitchRateKp;
     float positionKp;
     float velocityKp;
-  };
-
-  struct ControlOutput {
-    WheelSubsystem::Command wheels;
-    ServoSubsystem::Command servos;
   };
 
   void init();
@@ -62,7 +71,8 @@ private:
                const ServoSubsystem::Telemetry &servoTelemetry, float dt);
 
   WheelSubsystem::Command balance(const Command &cmd, float dt);
-  void sync(float dt);
+  void sync(const WheelSubsystem::Telemetry &wheelTelemetry,
+            const ControlOutput &controlOutput, float dt);
 
   Protected<Status> _status;
   Protected<Command> _command;
@@ -76,8 +86,10 @@ private:
   KalmanFilter _forwardVelocity{2.0f, 0.25f};
   KalmanFilter _turnVelocity{2.0f, 0.25f};
 
-  LowPassFilter _targetFwdVelLPF { 0.1f };
-  LowPassFilter _targetTurnVelLPF { 0.1f };
+  float _targetFwdVel = 0.0f;
+  float _targetTurnVel = 0.0f;
+  LowPassFilter _targetFwdVelLPF{0.1f};
+  LowPassFilter _targetTurnVelLPF{0.1f};
 
   float _positionError = 0.0f;
   unsigned long _lastUpdateTimeMs = 0;
