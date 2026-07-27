@@ -8,6 +8,7 @@ static constexpr const char *kApSsid = "wobl";
 static constexpr const char *kApPassword = "wobl1234";
 static constexpr uint16_t kUdpPort = 8888;
 static IPAddress kUdpAddress = IPAddress(192, 168, 4, 255);
+static unsigned long lastSendTime = 0;
 
 struct BroadcastTelemetry {
     uint32_t timestamp_ms;       
@@ -49,9 +50,12 @@ void Broadcaster::update() {
     return;
 
   auto tel = _robot.controller.telemetry();
+  if (tel.timestampMs == lastSendTime)
+    return;
 
+  lastSendTime = tel.timestampMs;
   BroadcastTelemetry bt;
-  bt.timestamp_ms = millis();
+  bt.timestamp_ms = tel.timestampMs;
   bt.pitch = tel.pitch;
   bt.pitchRate = tel.pitchRate;
   bt.roll = tel.roll;
@@ -68,10 +72,4 @@ void Broadcaster::update() {
   _udp.beginPacket(kUdpAddress, kUdpPort);
   _udp.write((const uint8_t *)&bt, sizeof(bt));
   _udp.endPacket();
-
-  static int count = 0;
-  if (++count % 100 == 0) {
-    Serial.printf("[broadcaster] sent telemetry packet (%u bytes)\n",
-                  sizeof(bt));
-  }
 }

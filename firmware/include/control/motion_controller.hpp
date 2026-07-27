@@ -26,6 +26,7 @@ public:
   };
 
   struct Telemetry {
+    unsigned long timestampMs;
     float pitch;
     float pitchRate;
 

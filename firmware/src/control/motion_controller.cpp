@@ -76,6 +76,7 @@ void MotionController::sync(const WheelSubsystem::Telemetry &wheelTelemetry,
                             const ControlOutput &controlOutput, float dt) {
   _status.write(Status{.syncRateHz = 1.0f / dt});
   _telemetry.write(Telemetry{
+      .timestampMs = millis(),
       .pitch = _pitch,
       .pitchRate = _pitchRate.value(),
       .roll = _roll,
@@ -102,7 +103,7 @@ MotionController::update(const ImuSubsystem::Telemetry &imuTelemetry,
   observe(imuTelemetry, wheelTelemetry, servoTelemetry, dt);
 
   auto cmdBody = _command.read();
-  ControlOutput output;
+  ControlOutput output = {};
 
   if (!cmdBody.enable) {
     _positionError = 0.0f;

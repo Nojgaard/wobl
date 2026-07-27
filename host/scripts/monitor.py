@@ -24,18 +24,18 @@ _FMT_SIZE = _FMT.size
 
 # Each entry: (entity_path, display_name, colour)
 _ENTITIES: list[tuple[str, str, tuple[int, int, int]]] = [
-    ("input/pitch", "Pitch", (255, 160, 0)),
-    ("input/pitch_rate", "Pitch Rate", (255, 80, 80)),
-    ("input/roll", "Roll", (0, 200, 255)),
-    ("input/roll_rate", "Roll Rate", (80, 160, 255)),
-    ("input/wheel/left_vel", "Left Wheel Vel", (80, 80, 255)),
-    ("input/wheel/right_vel", "Right Wheel Vel", (255, 200, 0)),
-    ("input/body/fwd_velocity", "Body Fwd Vel", (80, 255, 80)),
-    ("input/body/yaw_rate", "Body Yaw Rate", (255, 255, 80)),
-    ("output/target/fwd_velocity", "Target Fwd Vel", (160, 255, 160)),
-    ("output/target/yaw_rate", "Target Yaw Rate", (255, 255, 160)),
-    ("output/wheel/left_vel", "Cmd Wheel Left", (255, 80, 255)),
-    ("output/wheel/right_vel", "Cmd Wheel Right", (200, 80, 200)),
+    ("imu/pitch", "Pitch", (255, 160, 0)),
+    ("imu/pitch_rate", "Pitch Rate", (255, 80, 80)),
+    ("imu/roll", "Roll", (0, 200, 255)),
+    ("imu/roll_rate", "Roll Rate", (80, 160, 255)),
+    ("wheel/left_velocity", "Left Wheel Vel", (80, 80, 255)),
+    ("wheel/right_velocity", "Right Wheel Vel", (255, 200, 0)),
+    ("body/forward_velocity", "Body Fwd Vel", (80, 255, 80)),
+    ("body/yaw_rate", "Body Yaw Rate", (255, 255, 80)),
+    ("target/forward_velocity", "Target Fwd Vel", (160, 255, 160)),
+    ("target/yaw_rate", "Target Yaw Rate", (255, 255, 160)),
+    ("output/wheel/left", "Cmd Wheel Left", (255, 80, 255)),
+    ("output/wheel/right", "Cmd Wheel Right", (200, 80, 200)),
 ]
 
 _paths = [e[0] for e in _ENTITIES]
@@ -78,7 +78,6 @@ def main() -> None:
             try:
                 data, addr = sock.recvfrom(4096)
             except socket.timeout:
-                print("timeout")
                 continue
             if len(data) < _FMT_SIZE:
                 continue
@@ -90,9 +89,9 @@ def main() -> None:
             if recorder is not None:
                 recorder.log_many(fields, t_s=t_s)
 
-            pitch = fields["input/pitch"]
-            fwd = fields["input/body/fwd_velocity"]
-            yaw = fields["input/body/yaw_rate"]
+            pitch = fields["imu/pitch"]
+            fwd = fields["body/forward_velocity"]
+            yaw = fields["body/yaw_rate"]
             print(
                 f"\rpitch={pitch:+.3f}  fwd={fwd:+.3f}  yaw={yaw:+.3f}",
                 end="",
