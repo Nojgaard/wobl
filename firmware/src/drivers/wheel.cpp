@@ -125,8 +125,8 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
 
   _motor.linkDriver(&_driver);
 
-  _motor.controller = MotionControlType::velocity;
-  //_motor.controller = MotionControlType::torque;
+  //_motor.controller = MotionControlType::velocity;
+  _motor.controller = MotionControlType::torque;
   _motor.torque_controller = TorqueControlType::estimated_current;
 
   _motor.voltage_sensor_align = 5.0f;
@@ -229,42 +229,12 @@ void Wheel::command(bool enabled, float velocity) {
   }
 }
 
-void addFeedForwardEffects(BLDCMotor &motor, const Wheel::Command &command) {
-  float ffVoltage = 0.0f;
-
-  constexpr float kCoulombV = 0.3f;
-  constexpr float kCoulombRamp = 0.5f;
-  float absCmd = fabsf(command.velocity);
-  float mag =
-      (absCmd < kCoulombRamp) ? kCoulombV * (absCmd / kCoulombRamp) : kCoulombV;
-  ffVoltage += (command.velocity >= 0) ? mag : -mag;
-
-
-  motor.feed_forward_voltage.q = ffVoltage;
-}
-
-void gainSchedulePID(BLDCMotor &motor, const Wheel::Command &command,
-                     const Wheel::VelocityTuning &tuning) {
-  constexpr float kScheduleThreshold = 0.5f; // rad/s
-  constexpr float kLowSpeedP = 0.15f;         // reduced P at standstill
-
-  float absCmd = fabsf(command.velocity);
-  float blend = (absCmd < kScheduleThreshold)
-                    ? absCmd / kScheduleThreshold
-                    : 1.0f; // 0 = full low-speed, 1 = full normal
-
-  motor.PID_velocity.P = kLowSpeedP + blend * (tuning.p - kLowSpeedP);
-}
-
 void Wheel::update() {
   if (_motor.motor_status == FOCMotorStatus::motor_error)
     _status = Status::MotorError;
 
   if (!isOk())
     return;
-
-  gainSchedulePID(_motor, _command, _tuning);
-  addFeedForwardEffects(_motor, _command);
 
   _motor.loopFOC();
   _motor.move(_command.velocity);

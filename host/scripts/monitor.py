@@ -15,7 +15,6 @@ import argparse
 import socket
 import struct
 from pathlib import Path
-from typing import Optional
 
 from woblpy.record import Recorder
 
@@ -57,7 +56,7 @@ def main() -> None:
     args = parser.parse_args()
 
     live = args.live
-    recorder: Optional[Recorder] = None
+    recorder: Recorder | None = None
     if live or args.save is not None:
         recorder = Recorder("wobl-monitor", live=live, save_path=args.save)
         for path, name, colour in _ENTITIES:
@@ -77,7 +76,8 @@ def main() -> None:
         while True:
             try:
                 data, addr = sock.recvfrom(4096)
-            except socket.timeout:
+            except TimeoutError:
+                print("\rWaiting for telemetry broadcast...", end="", flush=True)
                 continue
             if len(data) < _FMT_SIZE:
                 continue

@@ -51,6 +51,8 @@ def main() -> None:
         f"offset={args.offset:.4f}"
     )
 
+    scale = 1.0
+
     if args.dry_run:
         return
 
@@ -63,6 +65,9 @@ def main() -> None:
             print(f"  {ser.readline().decode().strip()}")
 
         ser.write(f"g o={args.offset:.6f}\n".encode())
+        print(f"  {ser.readline().decode().strip()}")
+
+        ser.write(f"g c={scale:.6f}\n".encode())
         print(f"  {ser.readline().decode().strip()}")
 
         ser.write(b"g\n")

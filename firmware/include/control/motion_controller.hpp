@@ -47,6 +47,7 @@ public:
 
   struct Config {
     float pitchOffset;
+    float ctrlScale;
 
     float pitchKp;
     float pitchRateKp;
@@ -82,8 +83,9 @@ private:
 
   float _pitch = 0;
   float _roll = 0;
-  LinearFilter _rollRate{0.1f, 0.0f};
-  LinearFilter _pitchRate{0.1f, 0.0f};
+  LinearFilter _rollRate{0.00f, 0.0f};
+
+  LinearFilter _pitchRate{0.0f, 0.0f};
   KalmanFilter _forwardVelocity{2.0f, 0.25f};
   KalmanFilter _turnVelocity{2.0f, 0.25f};
 

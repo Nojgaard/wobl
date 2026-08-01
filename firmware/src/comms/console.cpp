@@ -11,14 +11,14 @@ static void _skipSpace(char **p) {
 // -------------------------------------------------------------------
 
 Robot *Console::_robot = nullptr;
-Broadcaster* Console::_broadcaster = nullptr;
+Broadcaster *Console::_broadcaster = nullptr;
 Commander Console::_commander(Serial);
 
 // -------------------------------------------------------------------
 // Public API
 // -------------------------------------------------------------------
 
-Console::Console(Robot *robot, Broadcaster* broadcaster) {
+Console::Console(Robot *robot, Broadcaster *broadcaster) {
   _robot = robot;
   _broadcaster = broadcaster;
 }
@@ -80,30 +80,27 @@ void Console::_cmdControllerConfig(char *arg) {
   if (sscanf(arg, "p=%f", &v) == 1) {
     Serial.printf("pitchKp:     %.3f -> %.3f\n", cfg.pitchKp, v);
     cfg.pitchKp = v;
-    set = true;
   } else if (sscanf(arg, "r=%f", &v) == 1) {
     Serial.printf("pitchRateKp: %.3f -> %.3f\n", cfg.pitchRateKp, v);
     cfg.pitchRateKp = v;
-    set = true;
   } else if (sscanf(arg, "v=%f", &v) == 1) {
     Serial.printf("velKp:       %.3f -> %.3f\n", cfg.velocityKp, v);
     cfg.velocityKp = v;
-    set = true;
   } else if (sscanf(arg, "x=%f", &v) == 1) {
     Serial.printf("posKp:       %.3f -> %.3f\n", cfg.positionKp, v);
     cfg.positionKp = v;
-    set = true;
   } else if (sscanf(arg, "o=%f", &v) == 1) {
     Serial.printf("offset:      %.3f -> %.3f\n", cfg.pitchOffset, v);
     cfg.pitchOffset = v;
-    set = true;
+  } else if (sscanf(arg, "c=%f", &v) == 1) {
+    Serial.printf("ctrlScale:   %.3f -> %.3f\n", cfg.ctrlScale, v);
+    cfg.ctrlScale = v;
   } else {
     Serial.printf("Unknown: '%s'. Try p=val r=val v=val x=val o=val\n", arg);
     return;
   }
 
-  if (set)
-    _robot->controller.config(cfg);
+  _robot->controller.config(cfg);
 }
 
 // ===================================================================
@@ -248,8 +245,8 @@ void Console::_cmdCalibrate(char *arg) {
 // ===================================================================
 
 void Console::_cmdImu(char *arg) {
-    auto imu = _robot->imu.telemetry();
-    Serial.printf("r=%.3f p=%.3f y=%.3f\n", imu.roll, imu.pitch, imu.yaw);
+  auto imu = _robot->imu.telemetry();
+  Serial.printf("r=%.3f p=%.3f y=%.3f\n", imu.roll, imu.pitch, imu.yaw);
 }
 
 void Console::_cmdEnableTelemetry(char *arg) {

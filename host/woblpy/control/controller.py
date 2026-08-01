@@ -25,7 +25,7 @@ class Controller:
         self.yaw = 0.0
 
         self.roll_rate = LinearFilter(0.8, 0.0)
-        self.pitch_rate = LinearFilter(0.9, 0.0)
+        self.pitch_rate = LinearFilter(1.0, 0.0)
         # self.pitch_rate = KalmanFilter(0.1, 0.02)
 
         self.yaw_rate = LinearFilter(0.5, 0.0)
@@ -110,7 +110,7 @@ class Controller:
         # torque_a = np.clip(torque_a, -0.5, 0.5)  # Limit torque to ±0.5 A for safety
         return DriveCommand(
             left_enabled=True,
-            left_velocity=float(ctrl_left_rps),
+            left_velocity=float(ctrl_vel),
             right_enabled=True,
-            right_velocity=float(ctrl_right_rps),
+            right_velocity=float(ctrl_vel),
         )

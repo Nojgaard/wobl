@@ -4,12 +4,22 @@ void MotionController::init() {
   _lastUpdateTimeMs = millis();
   _positionError = 0.0f;
 
-  _config.write(Config{
+  /*_config.write(Config{
       .pitchOffset = 0.07f,
+      .ctrlScale = 1.0f,
       .pitchKp = -4.11468176f,
       .pitchRateKp = -0.45214264f,
       .positionKp = -0.81649658f,
       .velocityKp = -1.2660191f,
+  });*/
+  // [-13.76390619  -0.80668466  -1.9971037   -1.24034735]
+  _config.write(Config{
+      .pitchOffset = 0.07f,
+      .ctrlScale = 1.0f,
+      .pitchKp = -13.76390619f,
+      .pitchRateKp = -0.80668466f,
+      .positionKp = -1.9971037f,
+      .velocityKp = -1.24034735f,
   });
 }
 
@@ -65,11 +75,13 @@ WheelSubsystem::Command MotionController::balance(const Command &cmdBody,
 
   float ctrlTurnVel = _targetTurnVel;
 
-  auto ctrlWheelVel = DiffDriveKinematics::toWheelVel(ctrlFwdVel, ctrlTurnVel);
+  // auto ctrlWheelVel = DiffDriveKinematics::toWheelVel(ctrlFwdVel,
+  // ctrlTurnVel);
+  float ctrlLeft = ctrlFwdVel * cfg.ctrlScale;
+  float ctrlRight = ctrlFwdVel * cfg.ctrlScale;
   return WheelSubsystem::Command{
-      .left = Wheel::Command{.enabled = true, .velocity = ctrlWheelVel.leftRps},
-      .right =
-          Wheel::Command{.enabled = true, .velocity = ctrlWheelVel.rightRps}};
+      .left = Wheel::Command{.enabled = true, .velocity = ctrlLeft},
+      .right = Wheel::Command{.enabled = true, .velocity = ctrlRight}};
 }
 
 void MotionController::sync(const WheelSubsystem::Telemetry &wheelTelemetry,
@@ -87,6 +99,7 @@ void MotionController::sync(const WheelSubsystem::Telemetry &wheelTelemetry,
                               .yawRate = _turnVelocity.value()},
       .targetBodyVel = BodyVelocity{.forwardVelocity = _targetFwdVel,
                                     .yawRate = _targetTurnVel},
+      .output = controlOutput,
 
   });
 }
