@@ -53,19 +53,20 @@ void Broadcaster::update() {
   if (tel.timestampMs == lastSendTime)
     return;
 
+  auto wtel = _robot.wheels.telemetry();
   lastSendTime = tel.timestampMs;
   BroadcastTelemetry bt;
   bt.timestamp_ms = tel.timestampMs;
-  bt.pitch = tel.pitch;
-  bt.pitchRate = tel.pitchRate;
-  bt.roll = tel.roll;
-  bt.rollRate = tel.rollRate;
-  bt.wheelVelLeft = tel.wheelVel.leftRps;
-  bt.wheelVelRight = tel.wheelVel.rightRps;
-  bt.bodyFwdVelocity = tel.bodyVel.forwardVelocity;
-  bt.bodyYawRate = tel.bodyVel.yawRate;
-  bt.targetFwdVelocity = tel.targetBodyVel.forwardVelocity;
-  bt.targetYawRate = tel.targetBodyVel.yawRate;
+  bt.pitch = tel.state.pitch;
+  bt.pitchRate = tel.state.pitchRate;
+  bt.roll = tel.state.roll;
+  bt.rollRate = tel.state.rollRate;
+  bt.wheelVelLeft = wtel.left.velocity;
+  bt.wheelVelRight = wtel.right.velocity;
+  bt.bodyFwdVelocity = tel.state.forwardVelocity;
+  bt.bodyYawRate = tel.state.turnVelocity;
+  bt.targetFwdVelocity = tel.command.forwardVelocity;
+  bt.targetYawRate = tel.command.turnVelocity;
   bt.wheelCmdLeft = tel.output.wheels.left.velocity;
   bt.wheelCmdRight = tel.output.wheels.right.velocity;
 

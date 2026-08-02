@@ -1,6 +1,7 @@
 #pragma once
 
 #include "robot.hpp"
+#include "common/lowpass_filter.h"
 
 class Pilot {
 public:
@@ -11,8 +12,10 @@ public:
 
 private:
   bool _enableController = false;
-  float _targetFwdVel = 0.0f;
-  float _targetTurnVel = 0.0f;
+
+  unsigned long _lastUpdateMs = 0;
+  LowPassFilter _tarFwdVel{0.05f};
+  LowPassFilter _tarTurnVel{0.05f};
 
   bool _pressedStart = false;
 

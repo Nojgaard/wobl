@@ -4,24 +4,17 @@ void MotionController::init() {
   _lastUpdateTimeMs = millis();
   _positionError = 0.0f;
 
-  /*_config.write(Config{
-      .pitchOffset = 0.07f,
-      .ctrlScale = 1.0f,
-      .pitchKp = -4.11468176f,
-      .pitchRateKp = -0.45214264f,
-      .positionKp = -0.81649658f,
-      .velocityKp = -1.2660191f,
-  });*/
-  // [-13.76390619  -0.80668466  -1.9971037   -1.24034735]
   _config.write(Config{
       .pitchOffset = 0.07f,
       .ctrlScale = 1.0f,
-      .pitchKp = -13.76390619f,
-      .pitchRateKp = -0.80668466f,
-      .positionKp = -1.9971037f,
-      .velocityKp = -1.24034735f,
+      .pitchKp = -15.248f,
+      .pitchRateKp = -1.354f,
+      .positionKp = -3.333f,
+      .velocityKp = -4.017f,
   });
 }
+
+MotionController::Status MotionController::status() { return _status.read(); }
 
 void MotionController::command(const Command &command) {
   _command.write(command);
@@ -36,71 +29,41 @@ MotionController::Telemetry MotionController::telemetry() {
 }
 MotionController::Config MotionController::config() { return _config.read(); }
 
-void MotionController::observe(const ImuSubsystem::Telemetry &imuTelemetry,
-                               const WheelSubsystem::Telemetry &wheelTelemetry,
-                               const ServoSubsystem::Telemetry &servoTelemetry,
-                               float dt) {
-  _pitch = imuTelemetry.pitch;
-  _roll = imuTelemetry.roll;
-  _pitchRate.update(imuTelemetry.pitchRate);
-  _rollRate.update(imuTelemetry.rollRate);
-
-  auto bodyVel = DiffDriveKinematics::toBodyVel(wheelTelemetry.left.velocity,
-                                                wheelTelemetry.right.velocity);
-  _forwardVelocity.update(bodyVel.forwardVelocity, dt);
-  _turnVelocity.update(bodyVel.yawRate, dt);
-}
-
-WheelSubsystem::Command MotionController::balance(const Command &cmdBody,
-                                                  float dt) {
+WheelSubsystem::Command MotionController::balance(const Command &cmd, const Observer::State &state, float dt) {
   auto cfg = _config.read();
 
-  if (!cmdBody.enable)
+  if (!cmd.enable)
     return WheelSubsystem::Command{};
 
-  _targetFwdVel = _targetFwdVelLPF(cmdBody.forwardVelocity);
-  _targetTurnVel = _targetTurnVelLPF(cmdBody.turnVelocity);
-
-  float pitchError = _pitch - cfg.pitchOffset;
-  float pitchRateError = _pitchRate.value();
-  float velocityError = _forwardVelocity.value() - _targetFwdVel;
+  float pitchError = state.pitch - cfg.pitchOffset;
+  float pitchRateError = state.pitchRate;
+  float velocityError = state.forwardVelocity - cmd.forwardVelocity;
 
   _positionError += velocityError * dt;
-  _positionError = std::clamp(_positionError, -0.3f, 0.3f);
+  _positionError = std::clamp(_positionError, -0.1f, 0.1f);
 
   float ctrlFwdVel = -cfg.pitchKp * pitchError;
   ctrlFwdVel -= cfg.pitchRateKp * pitchRateError;
   ctrlFwdVel -= cfg.positionKp * _positionError;
   ctrlFwdVel -= cfg.velocityKp * velocityError;
 
-  float ctrlTurnVel = _targetTurnVel;
+  float ctrlTurnVel = cmd.turnVelocity;
 
-  // auto ctrlWheelVel = DiffDriveKinematics::toWheelVel(ctrlFwdVel,
-  // ctrlTurnVel);
-  float ctrlLeft = ctrlFwdVel * cfg.ctrlScale;
-  float ctrlRight = ctrlFwdVel * cfg.ctrlScale;
+  float ctrlLeft = ctrlFwdVel * cfg.ctrlScale + ctrlTurnVel;
+  float ctrlRight = ctrlFwdVel * cfg.ctrlScale - ctrlTurnVel;
   return WheelSubsystem::Command{
       .left = Wheel::Command{.enabled = true, .velocity = ctrlLeft},
       .right = Wheel::Command{.enabled = true, .velocity = ctrlRight}};
 }
 
-void MotionController::sync(const WheelSubsystem::Telemetry &wheelTelemetry,
+void MotionController::sync(const Command &cmd, const Observer::State &state,
                             const ControlOutput &controlOutput, float dt) {
   _status.write(Status{.syncRateHz = 1.0f / dt});
   _telemetry.write(Telemetry{
       .timestampMs = millis(),
-      .pitch = _pitch,
-      .pitchRate = _pitchRate.value(),
-      .roll = _roll,
-      .rollRate = _rollRate.value(),
-      .wheelVel = WheelVelocity{.leftRps = wheelTelemetry.left.velocity,
-                                .rightRps = wheelTelemetry.right.velocity},
-      .bodyVel = BodyVelocity{.forwardVelocity = _forwardVelocity.value(),
-                              .yawRate = _turnVelocity.value()},
-      .targetBodyVel = BodyVelocity{.forwardVelocity = _targetFwdVel,
-                                    .yawRate = _targetTurnVel},
+      .command = cmd,
+      .state = state,
       .output = controlOutput,
-
   });
 }
 
@@ -113,24 +76,23 @@ MotionController::update(const ImuSubsystem::Telemetry &imuTelemetry,
   _lastUpdateTimeMs = now;
   dt = std::min(dt, 0.05f);
 
-  observe(imuTelemetry, wheelTelemetry, servoTelemetry, dt);
-
-  auto cmdBody = _command.read();
+  auto cmd = _command.read();
   ControlOutput output = {};
 
-  if (!cmdBody.enable) {
+  if (!cmd.enable) {
     _positionError = 0.0f;
     return output;
   }
 
-  output.wheels = balance(cmdBody, dt);
+  auto state = observer.update(imuTelemetry, wheelTelemetry, servoTelemetry, dt);
+  output.wheels = balance(cmd, state, dt);
 
   output.servos = ServoSubsystem::Command{
       .left = Servo::Command{.enabled = true, .positionRad = 0.1f},
       .right = Servo::Command{.enabled = true, .positionRad = 0.1f},
   };
 
-  sync(wheelTelemetry, output, dt);
+  sync(cmd, state, output, dt);
 
   return output;
 }

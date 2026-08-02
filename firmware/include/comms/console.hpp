@@ -12,6 +12,7 @@ public:
 private:
   static void _cmdStatus(char *arg);
   static void _cmdControllerConfig(char *arg);
+  static void _cmdObserverConfig(char *arg);
   static void _cmdWheelConfig(char *arg);
   static void _cmdEnable(char *arg);
   static void _cmdWheel(char *arg);

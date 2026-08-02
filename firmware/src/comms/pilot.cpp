@@ -8,7 +8,7 @@ static constexpr float AXIS_DEADZONE = 30;
 static constexpr float AXIS_MAX = 520;
 
 static constexpr float MAX_FWD_VEL = 0.2f;  // m/s
-static constexpr float MAX_TURN_VEL = 0.5f; // rad/s
+static constexpr float MAX_TURN_VEL = 0.08f; 
 
 float normalizeAxis(int32_t value) {
   if (abs(value) < AXIS_DEADZONE) {
@@ -42,9 +42,15 @@ void Pilot::init() {
   BP32.setup(&onConnectedController, &onDisconnectedController, false);
   // BP32.forgetBluetoothKeys();
   BP32.enableVirtualDevice(false);
+
+  _lastUpdateMs = millis();
 }
 
 void Pilot::update() {
+  unsigned long now = millis();
+  float dt = (now - _lastUpdateMs) / 1000.0f;
+  _lastUpdateMs = now;
+  
   if (!BP32.update() || !hasData()) {
     return;
   }
@@ -56,12 +62,14 @@ void Pilot::update() {
   }
   _pressedStart = gamepad->miscStart();
 
-  _targetFwdVel = normalizeAxis(-gamepad->axisY()) * MAX_FWD_VEL;
-  _targetTurnVel = normalizeAxis(gamepad->axisRX()) * MAX_TURN_VEL;
+  _tarFwdVel.Ts = dt;
+  _tarTurnVel.Ts = dt;
+  float tarFwdVel = _tarFwdVel(normalizeAxis(-gamepad->axisY()) * MAX_FWD_VEL);
+  float tarTurnVel = _tarTurnVel(normalizeAxis(gamepad->axisRX()) * MAX_TURN_VEL);
 
   _robot.controller.command({.enable = _enableController,
-                             .forwardVelocity = _targetFwdVel,
-                             .turnVelocity = _targetTurnVel});
+                             .forwardVelocity = tarFwdVel,
+                             .turnVelocity = tarTurnVel});
 
   /*Serial.printf("buttons: 0x%04x, axis L: %4d, %4d, "
                 "axis R: %4d, %4d, start: 0x%04x, sel: 0x%04x\n",

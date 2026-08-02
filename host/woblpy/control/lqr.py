@@ -22,16 +22,16 @@ def compute_lqr_gains():
 
     Q = np.diag(
         [
-            2.0,  # x          (prefer to stay in place)
-            3.0,  # x_dot      (do not run away)
-            150.0,  # theta      (most important: avoid falling)
-            0.5,  # theta_dot  (was 0.5; increased to push phase lead >45 deg at ~1.6 Hz)
+            10.0,  # x          (prefer to stay in place)
+            10.0,  # x_dot      (do not run away)
+            10.0,  # theta      (most important: avoid falling)
+            1.0,  # theta_dot
         ]
     )
 
     # R penalizes the control effort (wheel torque).
     # Larger R → less aggressive control (reduced torque usage).
-    R = np.array([[1.3]])
+    R = np.array([[0.9]])
 
     K, _, _ = control.lqr(A, B, Q, R)
     K = K[0]

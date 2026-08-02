@@ -25,6 +25,7 @@ Console::Console(Robot *robot, Broadcaster *broadcaster) {
 
 void Console::init() {
   _commander.add('s', _cmdStatus, "status");
+  _commander.add('o', _cmdObserverConfig, "config observer [r|p][=val]");
   _commander.add('g', _cmdControllerConfig, "config control [p|r|v|x|o][=val]");
   _commander.add('t', _cmdWheelConfig, "config wheel [p|i|d|f][=val]");
   _commander.add('e', _cmdEnable, "enable [0|1]");
@@ -49,12 +50,14 @@ void Console::_cmdStatus(char *arg) {
   auto is = r.imu.status();
   auto ws = r.wheels.status();
   auto ss = r.servos.status();
+  auto cs = r.controller.status();
 
   Serial.printf("IMU   status=%i sync=%.0fHz\n", is.status, is.syncRateHz);
   Serial.printf("WHEEL status=[L=%i R=%i] sync=%.0fHz update=%.0fHz\n", ws.left,
                 ws.right, ws.syncRateHz, ws.updateRateHz);
   Serial.printf("SERVO status=[L=%i R=%i] cmdSync=%.0fHz telSync=%.0fHz\n",
                 ss.left, ss.right, ss.cmdSyncRateHz, ss.telSyncRateHz);
+  Serial.printf("CTRL  sync=%.0fHz\n", cs.syncRateHz);        
   Serial.printf("BATT  volt=%.2fV\n", ss.voltage);
 }
 
@@ -259,4 +262,29 @@ void Console::_cmdEnableTelemetry(char *arg) {
   } else {
     Serial.printf("Expected 0 or 1, got '%s'\n", arg);
   }
+}
+
+void Console::_cmdObserverConfig(char *arg) {
+  _skipSpace(&arg);
+  auto cfg = _robot->controller.observer.config();
+
+  if (*arg == '\0') {
+    Serial.printf("tcRates=%.3f tcVelocities=%.3f\n", cfg.tcRates,
+                  cfg.tcVelocities);
+    return;
+  }
+
+  float v;
+  if (sscanf(arg, "r=%f", &v) == 1) {
+    Serial.printf("tcRates: %.3f -> %.3f\n", cfg.tcRates, v);
+    cfg.tcRates = v;
+  } else if (sscanf(arg, "v=%f", &v) == 1) {
+    Serial.printf("tcVelocities:   %.3f -> %.3f\n", cfg.tcVelocities, v);
+    cfg.tcVelocities = v;
+  } else {
+    Serial.printf("Unknown: '%s'. Try r=val v=val\n", arg);
+    return;
+  }
+
+  _robot->controller.observer.config(cfg);
 }
