@@ -12,15 +12,17 @@ static void _skipSpace(char **p) {
 
 Robot *Console::_robot = nullptr;
 Broadcaster *Console::_broadcaster = nullptr;
+Pilot *Console::_pilot = nullptr;
 Commander Console::_commander(Serial);
 
 // -------------------------------------------------------------------
 // Public API
 // -------------------------------------------------------------------
 
-Console::Console(Robot *robot, Broadcaster *broadcaster) {
+Console::Console(Robot *robot, Broadcaster *broadcaster, Pilot *pilot) {
   _robot = robot;
   _broadcaster = broadcaster;
+  _pilot = pilot;
 }
 
 void Console::init() {
@@ -33,6 +35,7 @@ void Console::init() {
   _commander.add('c', _cmdCalibrate, "calibrate [i|w]");
   _commander.add('i', _cmdImu, "imu telemetry");
   _commander.add('b', _cmdEnableTelemetry, "enable telemetry [0|1]");
+  _commander.add('p', _cmdPilot, "pilot [d|s|f]");
 
   Serial.println("Console ready. Type '?' for commands.");
 }
@@ -46,19 +49,22 @@ void Console::update() { _commander.run(); }
 void Console::_cmdStatus(char *arg) {
   _skipSpace(&arg);
   auto &r = *_robot;
+  auto &p = *_pilot;
 
   auto is = r.imu.status();
   auto ws = r.wheels.status();
   auto ss = r.servos.status();
   auto cs = r.controller.status();
+  auto ps = p.status(); 
 
   Serial.printf("IMU   status=%i sync=%.0fHz\n", is.status, is.syncRateHz);
   Serial.printf("WHEEL status=[L=%i R=%i] sync=%.0fHz update=%.0fHz\n", ws.left,
                 ws.right, ws.syncRateHz, ws.updateRateHz);
   Serial.printf("SERVO status=[L=%i R=%i] cmdSync=%.0fHz telSync=%.0fHz\n",
                 ss.left, ss.right, ss.cmdSyncRateHz, ss.telSyncRateHz);
-  Serial.printf("CTRL  sync=%.0fHz\n", cs.syncRateHz);        
+  Serial.printf("CTRL  sync=%.0fHz\n", cs.syncRateHz);
   Serial.printf("BATT  volt=%.2fV\n", ss.voltage);
+  Serial.printf("Pilot sync=%.0fHz\n");
 }
 
 // ===================================================================
@@ -287,4 +293,27 @@ void Console::_cmdObserverConfig(char *arg) {
   }
 
   _robot->controller.observer.config(cfg);
+}
+
+void Console::_cmdPilot(char *arg) {
+  _skipSpace(&arg);
+
+  if (*arg == '\0') {
+    Serial.println("Usage: pilot d=disconnect, s[0|1]=scan, f=forget");
+    return;
+  }
+
+  int value;
+  if (strcmp(arg, "d\n") == 0) {
+    Serial.println("Disconnecting gamepad...");
+    _pilot->disconnect();
+  } else if (sscanf(arg, "s%d", &value) == 1) {
+    _pilot->scanForDevices(value != 0);
+    Serial.printf("Scan %s\n", value ? "ENABLED" : "DISABLED");
+  } else if (strcmp(arg, "f\n") == 0) {
+    Serial.println("Forgetting paired devices...");
+    _pilot->forgetDevices();
+  } else {
+    Serial.printf("Unknown: '%s'. Try: d s0 s1 f\n", arg);
+  }
 }

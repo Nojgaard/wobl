@@ -1,11 +1,12 @@
 #pragma once
 #include "robot.hpp"
 #include "comms/broadcaster.hpp"
+#include "comms/pilot.hpp"
 #include <SimpleFOC.h>
 
 class Console {
 public:
-  Console(Robot *robot, Broadcaster* broadcaster);
+  Console(Robot *robot, Broadcaster* broadcaster, Pilot* pilot);
   void init();
   void update();
 
@@ -19,8 +20,10 @@ private:
   static void _cmdCalibrate(char *arg);
   static void _cmdImu(char *arg);
   static void _cmdEnableTelemetry(char *arg);
+  static void _cmdPilot(char *arg);
 
   static Robot *_robot;
   static Broadcaster* _broadcaster;
+  static Pilot* _pilot;
   static Commander _commander;
 };

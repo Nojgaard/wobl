@@ -90,9 +90,15 @@ void ServoSubsystem::syncTelemetry() {
 
 void ServoSubsystem::loop() {
   for (;;) {
+    auto s = status();
+    if (!s.left || !s.right) {
+      vTaskDelay(pdMS_TO_TICKS(100));
+      continue;
+    }
+
     syncCommand();
     syncTelemetry();
-    vTaskDelay(5 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 

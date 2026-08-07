@@ -43,7 +43,7 @@ void Robot::init() {
   controller.init();
 
   xTaskCreatePinnedToCore(loopWheels, "foc", 4096, &wheels, 24, NULL, 1);
-  xTaskCreatePinnedToCore(loopImu, "imu", 4096, &imu, 10, NULL, 0);
-  xTaskCreatePinnedToCore(loopServos, "servo", 4096, &servos, 10, NULL, 0);
+  xTaskCreatePinnedToCore(loopImu, "imu", 4096, &imu, 16, NULL, 0);
+  xTaskCreatePinnedToCore(loopServos, "servo", 4096, &servos, 4, NULL, 0);
   xTaskCreatePinnedToCore(loopControl, "controller", 4096, this, 10, NULL, 0);
 }

@@ -131,10 +131,11 @@ int Wheel::init(float voltage_supply, float voltage_limit, TwoWire &wire) {
 
   _motor.voltage_sensor_align = 5.0f;
   //_motor.motion_downsample = 2; // Try to stabilize velocity estimation
-  if (!loadTuningFromNvs()) {
+  /*if (!loadTuningFromNvs()) {
     tune(VelocityTuning());
-  }
+  }*/
   _motor.LPF_angle.Tf = 0.001f;
+  _motor.LPF_velocity.Tf = 0.02f;
 
   status = _motor.init();
   if (status != 1) {

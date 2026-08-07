@@ -34,6 +34,6 @@ private:
   LowPassFilter _pitchRate{0.0f};
   LowPassFilter _rollRate{0.0f};
 
-  LowPassFilter _leftWheelVelocity{0.01f};
-  LowPassFilter _rightWheelVelocity{0.01f};
+  LowPassFilter _leftWheelVelocity{0.0f};
+  LowPassFilter _rightWheelVelocity{0.0f};
 };

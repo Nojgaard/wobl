@@ -8,11 +8,11 @@ static void loop(void *param) {
     unsigned long now = millis();
 
     if (now - lastUpdateTime >= 50) {
-      comms->pilot.update();
       comms->console.update();
       lastUpdateTime = now;
     }
 
+    comms->pilot.update();
     comms->broadcaster.update();
 
     vTaskDelay(pdMS_TO_TICKS(5));

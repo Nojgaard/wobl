@@ -26,7 +26,9 @@ struct BroadcastTelemetry {
     float    wheelCmdRight;
 } __attribute__((packed));
 
-void Broadcaster::init() {}
+void Broadcaster::init() {
+  WiFi.mode(WIFI_OFF);
+}
 
 void Broadcaster::enable(bool on) {
   if (on && !_enabled) {
