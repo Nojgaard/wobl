@@ -128,7 +128,15 @@ void WheelSubsystem::sync() {
 }
 
 void WheelSubsystem::loop() {
+  static unsigned long lastUpdateUs = 0;
+  lastUpdateUs = micros();
   for (;;) {
+    auto now = micros();
+    // I2C reads interferes with BT so we give the sensors a break for a little while
+    if ((now - lastUpdateUs) < 750)
+      continue;
+    
+    lastUpdateUs = now;
     _wheelLeft.update();
     _wheelRight.update();
     _updateCountSinceLastSync += 1;
