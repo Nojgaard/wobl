@@ -1,10 +1,4 @@
-"""Bringup script for the WOBL robot simulation.
-
-The control loop runs in the main thread: the MuJoCo Application queries the
-sim state each step and feeds it into the Controller via ControlPolicy.  The
-only background thread is the pynput keyboard listener (input-only), which
-writes velocity targets that the policy applies on the next main tick.
-"""
+"""Bringup script for the WOBL robot simulation."""
 
 import argparse
 import signal

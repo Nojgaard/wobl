@@ -8,20 +8,15 @@ from dm_env import TimeStep
 from woblpy.control.motion_controller import MotionController
 from woblpy.record import Recorder
 
-_VELOCITY_RESOLUTION = 0.105  # rad/s — matches real DDSM encoder quantization
-
 
 class ControlPolicy:
-    """dm_control policy: observation -> MotionController -> wheel action."""
-
     def __init__(
         self,
-        controller: MotionController | None = None,
         recorder: Recorder | None = None,
         hip_pos: float = 0.1,
         dt: float = 0.01,
     ) -> None:
-        self._controller = controller if controller is not None else MotionController()
+        self._controller = MotionController()
         self._recorder = recorder
         self._hip_pos = hip_pos
         self._dt = dt
@@ -30,12 +25,10 @@ class ControlPolicy:
         self._target_yaw = 0.0
 
     def set_velocity_target(self, fwd_velocity: float, yaw_rate: float) -> None:
-        """Update the target forward velocity and yaw rate (rad/s)."""
         self._target_fwd = fwd_velocity
         self._target_yaw = yaw_rate
 
     def reset_velocity_target(self) -> None:
-        """Zero the targets; the controller coasts to a stop."""
         self._target_fwd = 0.0
         self._target_yaw = 0.0
 

@@ -1,14 +1,4 @@
-"""State observer, reading the robot state straight from the observation dict.
-
-The sim policy hands the controller the raw dm_control observation dict
-(framequat, gyro, joint velocities).  The observer turns that directly into the
-filtered state the balance controller operates on: roll, pitch, filtered body
-rates, and forward/turn velocity from the wheel speeds.
-
-Wheel velocities are quantized to the real DDSM encoder resolution before
-filtering; the filters themselves default to passthrough (Tf = 0) like the
-firmware observer.
-"""
+"""State observer, reading the robot state straight from the observation dict."""
 
 from __future__ import annotations
 
@@ -20,12 +10,6 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 from woblpy.control.low_pass_filter import LowPassFilter
-
-_VELOCITY_RESOLUTION = 0.105  # rad/s — real DDSM encoder quantization
-
-
-def _quantize(v: float) -> float:
-    return round(v / _VELOCITY_RESOLUTION) * _VELOCITY_RESOLUTION
 
 
 class Observer:
@@ -46,7 +30,6 @@ class Observer:
         turn_velocity: float = 0.0
 
     def __init__(self) -> None:
-        # Tf = 0 → passthrough, matching the firmware observer defaults.
         self._roll_rate = LowPassFilter(0.0)
         self._pitch_rate = LowPassFilter(0.0)
         self._left_wheel_velocity = LowPassFilter(0.0)
@@ -54,7 +37,6 @@ class Observer:
         self._state = self.State()
 
     def update(self, obs: Mapping[str, Any], dt: float) -> State:
-        """Update the state estimate from a policy observation dict."""
         orientation = np.asarray(obs["robot/orientation"], dtype=float)
         if not orientation.any():  # zero quaternion on the first frame
             return self._state
@@ -65,8 +47,8 @@ class Observer:
 
         gyro = obs["robot/angular_velocity"]
         wheel_vel = obs["robot/joint_velocities"]
-        lv = self._left_wheel_velocity(_quantize(wheel_vel[2]), dt)
-        rv = self._right_wheel_velocity(_quantize(wheel_vel[3]), dt)
+        lv = self._left_wheel_velocity(wheel_vel[2], dt)
+        rv = self._right_wheel_velocity(wheel_vel[3], dt)
 
         self._state = self.State(
             roll=roll,

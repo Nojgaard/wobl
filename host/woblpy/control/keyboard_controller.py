@@ -1,15 +1,3 @@
-"""Reads arrow keys from the terminal and converts them to velocity commands.
-
-Usage:
-    kbd = KeyboardController(policy)
-    kbd.start()
-    # ... main loop runs as normal ...
-    kbd.stop()
-
-Hold UP/DOWN for forward/backward velocity, LEFT/RIGHT for yaw rate.
-Release all keys to coast to a stop (0 velocity, 0 yaw rate).
-"""
-
 from __future__ import annotations
 
 import pynput
