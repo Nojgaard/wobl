@@ -7,7 +7,7 @@ static ControllerPtr gamepad = nullptr;
 static constexpr float AXIS_DEADZONE = 30;
 static constexpr float AXIS_MAX = 520;
 
-static constexpr float MAX_FWD_VEL = 0.15f; // m/s
+static constexpr float MAX_FWD_VEL = 0.3f; // m/s
 static constexpr float MAX_TURN_VEL = 0.5f;
 
 float normalizeAxis(int32_t value) {
@@ -87,7 +87,7 @@ void Pilot::update() {
 
   _status.write({.syncRate = 1000.0f / dt});
 
-  static unsigned long lastPrintMs = 0;
+  /*static unsigned long lastPrintMs = 0;
   if (now - lastPrintMs > 1000) {
     Serial.printf("buttons: 0x%04x, axis L: %4d, %4d, "
                   "axis R: %4d, %4d, start: 0x%04x, sel: 0x%04x %.4f\n",
@@ -95,5 +95,5 @@ void Pilot::update() {
                   gamepad->axisRX(), gamepad->axisRY(), gamepad->miscStart(),
                   gamepad->miscSelect(), dt);
     lastPrintMs = now;
-  }
+  }*/
 }

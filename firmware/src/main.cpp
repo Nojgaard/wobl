@@ -1,5 +1,5 @@
-#include "robot.hpp"
 #include "comms/comms.hpp"
+#include "robot.hpp"
 
 #include <Arduino.h>
 

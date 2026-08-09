@@ -63,8 +63,8 @@ void Console::_cmdStatus(char *arg) {
   Serial.printf("SERVO status=[L=%i R=%i] cmdSync=%.0fHz telSync=%.0fHz\n",
                 ss.left, ss.right, ss.cmdSyncRateHz, ss.telSyncRateHz);
   Serial.printf("CTRL  sync=%.0fHz\n", cs.syncRateHz);
+  Serial.printf("Pilot sync=%.0fHz\n", ps.syncRate);
   Serial.printf("BATT  volt=%.2fV\n", ss.voltage);
-  Serial.printf("Pilot sync=%.0fHz\n");
 }
 
 // ===================================================================
