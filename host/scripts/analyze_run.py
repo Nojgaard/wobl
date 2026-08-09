@@ -1,140 +1,119 @@
-from woblpy.control.diff_drive_kinematics import DiffDriveKinematics
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import gridspec
+
 from woblpy.record import load_as_dataframe
-
-# Time window for aggregate stats (seconds)
-STATS_WINDOW = (224.0, 226.0)
-
-
-def print_stats(df, t_start: float, t_end: float) -> None:
-    """Print mean ± std (min / max) for key columns in the given time window."""
-    mask = (df.index >= t_start) & (df.index <= t_end)
-    window = df[mask]
-
-    if window.empty:
-        print(f"\n[stats] No data in window [{t_start}, {t_end}]")
-        return
-
-    print(f"\n=== Aggregate Stats [{t_start}–{t_end}s] ({len(window)} samples) ===")
-    print(f"{'Metric':<30} {'Mean':>10} {'Std':>10} {'Min':>10} {'Max':>10}")
-    print("-" * 74)
-
-    for col, label in [
-        ("imu/attitude/pitch", "Pitch (rad)"),
-        ("imu/gyro/x", "Pitch Rate (rad/s)"),
-        ("controller/fwd_velocity", "Fwd Velocity (m/s)"),
-        ("wheel/telem/left/velocity", "Left Wheel Vel (rad/s)"),
-        ("wheel/telem/right/velocity", "Right Wheel Vel (rad/s)"),
-        ("wheel/telem/left/current", "Left Current (A)"),
-        ("wheel/telem/right/current", "Right Current (A)"),
-    ]:
-        if col in window.columns:
-            s = window[col].dropna()
-            if len(s) > 0:
-                print(
-                    f"{label:<30} {s.mean():>10.4f} {s.std():>10.4f} {s.min():>10.4f} {s.max():>10.4f}"
-                )
-            else:
-                print(f"{label:<30} {'(all NaN)':>44}")
-    print()
 
 
 def main() -> None:
-    import matplotlib.pyplot as plt
+    df = load_as_dataframe("data/run_mk4.rrd")
 
-    df = load_as_dataframe("data/bringup.rrd")
-    print("Available columns:")
-    print(df.columns.tolist())
-    print(df.head())
+    pitch = df["imu/pitch"].dropna()
+    pitch_rate = df["imu/pitch_rate"].dropna()
+    out_left = df["output/wheel/left"].dropna()
+    out_right = df["output/wheel/right"].dropna()
+    vel_body = df["body/forward_velocity"].dropna()
+    vel_target = df["target/forward_velocity"].dropna()
 
-    drive = DiffDriveKinematics(0.3, 0.04, 20.0)
-    # Plot key signals to diagnose oscillation
-    fig, axs = plt.subplots(5, 1, figsize=(12, 14), sharex=True)
+    fig = plt.figure(figsize=(13, 10), tight_layout=True)
+    fig.suptitle("Balance analysis – torque mode", fontweight="bold")
+    gs = gridspec.GridSpec(4, 1, figure=fig)
 
-    # 1. Pitch angle
-    if "imu/attitude/pitch" in df.columns:
-        axs[0].plot(df.index, df["imu/attitude/pitch"], label="Pitch (rad)")
-        axs[0].set_ylabel("Pitch (rad)")
+    ax0 = fig.add_subplot(gs[0])
+    ax0.plot(pitch.index, pitch.values, color="tab:orange", label="pitch (rad)")
+    ax0.axhline(0, color="gray", linewidth=0.6, linestyle="--")
+    ax0.set_ylabel("Pitch (rad)")
+    ax0.legend(loc="upper right")
+    ax0.grid(True, alpha=0.3)
 
-        axs[0].legend()
+    # Numerical derivative of pitch as a sanity-check against the gyro signal
+    pitch_rate_derived = np.gradient(pitch.values, pitch.index.to_numpy())
+
+    # Align derived and gyro signals on shared timestamps to compute scale ratio
+    pr_on_pitch_idx = pitch_rate.reindex(pitch.index, method="nearest", tolerance=0.05)
+    valid = ~np.isnan(pr_on_pitch_idx.values) & (np.abs(pitch_rate_derived) > 1e-6)
+    if valid.sum() > 10:
+        scale_ratio = np.median(
+            pitch_rate_derived[valid] / pr_on_pitch_idx.values[valid]
+        )
+        print(f"d(pitch)/dt  vs  gyro scale ratio (median): {scale_ratio:.1f}x")
+        print(
+            f"  → gyro is {scale_ratio:.1f}x too small  (gyro_scale in imu.cpp is off by this factor)"
+        )
     else:
-        axs[0].set_visible(False)
+        scale_ratio = 1.0
 
-    # 2. Pitch rate
-    if "imu/gyro/x" in df.columns:
-        axs[1].plot(df.index, df["imu/gyro/x"], label="Pitch Rate (rad/s)")
-        axs[1].set_ylabel("Pitch Rate (rad/s)")
-        axs[1].legend()
-    else:
-        axs[1].set_visible(False)
+    ax1 = fig.add_subplot(gs[1], sharex=ax0)
+    ax1.plot(
+        pitch_rate.index,
+        pitch_rate.values,
+        color="tab:red",
+        label="pitch rate",
+    )
+    ax1.axhline(0, color="gray", linewidth=0.6, linestyle="--")
+    ax1.set_ylabel("Pitch rate (rad/s)")
+    ax1.legend(loc="upper right")
+    ax1.grid(True, alpha=0.3)
 
-    # 3. Forward velocity
-    if (
-        "controller/fwd_velocity" in df.columns
-        and "wheel/cmd/left/velocity" in df.columns
-        and "wheel/cmd/right/velocity" in df.columns
-    ):
-        # Compute commanded forward velocity for each row
-        left = df["wheel/cmd/left/velocity"].to_numpy()
-        right = df["wheel/cmd/right/velocity"].to_numpy()
-        # Use vectorized computation for forward velocity
-        fwd_velocity_cmd = (left + right) / 2 * drive.wheel_radius
+    ax2 = fig.add_subplot(gs[2], sharex=ax0)
+    # Average the two wheel outputs to get net forward torque drive
+    out_avg = (
+        out_left.reindex(out_left.index.union(out_right.index)).ffill()
+        + out_right.reindex(out_left.index.union(out_right.index)).ffill()
+    ) / 2
+    ax2.plot(
+        out_left.index,
+        out_left.values,
+        color="tab:blue",
+        alpha=0.6,
+        label="output left",
+    )
+    ax2.plot(
+        out_right.index,
+        out_right.values,
+        color="tab:cyan",
+        alpha=0.6,
+        label="output right",
+    )
+    ax2.plot(
+        out_avg.index,
+        out_avg.values,
+        color="tab:purple",
+        linewidth=1.5,
+        label="output avg",
+    )
+    ax2.axhline(0, color="gray", linewidth=0.6, linestyle="--")
+    ax2.set_ylabel("Wheel output")
+    ax2.legend(loc="upper right")
+    ax2.grid(True, alpha=0.3)
 
-        axs[2].plot(df.index, df["imu/attitude/pitch"], label="Pitch (rad)")
-        axs[2].plot(df.index, df["controller/fwd_velocity"], label="Fwd Velocity (m/s)")
-        axs[2].plot(
-            df.index, fwd_velocity_cmd, label="Cmd Fwd Velocity (m/s)", linestyle="--"
+    ax3 = fig.add_subplot(gs[3], sharex=ax0)
+    ax3.plot(
+        vel_body.index, vel_body.values, color="tab:green", label="body fwd vel (m/s)"
+    )
+    ax3.plot(
+        vel_target.index,
+        vel_target.values,
+        color="tab:olive",
+        linestyle="--",
+        label="target fwd vel (m/s)",
+    )
+    ax3.axhline(0, color="gray", linewidth=0.6, linestyle="--")
+    ax3.set_ylabel("Fwd velocity (m/s)")
+    ax3.set_xlabel("Time (s)")
+    ax3.legend(loc="upper right")
+    ax3.grid(True, alpha=0.3)
+
+    # Print phase relationship to help spot oscillation cause
+    common = pitch.index.intersection(out_avg.index)
+    if len(common) > 10:
+        p = pitch.reindex(common).ffill().values
+        o = out_avg.reindex(common).ffill().values
+        corr = np.corrcoef(p, o)[0, 1]
+        print(
+            f"Pitch–output correlation: {corr:+.3f}  "
+            f"({'in-phase (proportional gain dominant)' if corr > 0.3 else 'out-of-phase (derivative/rate dominant)' if corr < -0.3 else 'weakly correlated'})"
         )
-        axs[2].set_ylabel("Fwd Velocity (m/s)")
-        axs[2].legend()
-
-    else:
-        axs[2].set_visible(False)
-
-    # 4. Wheel velocities (left/right)
-    plotted = False
-    if "wheel/cmd/left/velocity" in df.columns:
-        axs[3].plot(
-            df.index, df["wheel/cmd/left/velocity"], label="Left Wheel Cmd (rad/s)"
-        )
-        axs[3].plot(
-            df.index, df["wheel/telem/left/velocity"], label="Left Wheel Telem (rad/s)"
-        )
-        plotted = True
-    if "wheel/cmd/right/velocity" in df.columns:
-        axs[3].plot(
-            df.index, df["wheel/cmd/right/velocity"], label="Right Wheel Cmd (rad/s)"
-        )
-        axs[3].plot(
-            df.index,
-            df["wheel/telem/right/velocity"],
-            label="Right Wheel Telem (rad/s)",
-        )
-        plotted = True
-    if plotted:
-        axs[3].set_ylabel("Wheel Vel (rad/s)")
-        axs[3].legend()
-    else:
-        axs[3].set_visible(False)
-
-    # 5. Wheel current setpoints (left/right)
-    if (
-        "wheel/telem/left/current" in df.columns
-        and "wheel/telem/right/current" in df.columns
-    ):
-        axs[4].plot(df.index, df["wheel/telem/left/current"], label="Left Current (A)")
-        axs[4].plot(
-            df.index, df["wheel/telem/right/current"], label="Right Current (A)"
-        )
-        axs[4].set_ylabel("Current (A)")
-        axs[4].legend()
-    else:
-        axs[4].set_visible(False)
-
-    axs[-1].set_xlabel("Timestamp (index)")
-    plt.suptitle("Self-Balancing Robot: Key Signals")
-    plt.tight_layout()
-
-    print_stats(df, *STATS_WINDOW)
 
     plt.show()
 

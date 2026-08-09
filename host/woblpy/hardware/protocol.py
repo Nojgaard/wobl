@@ -30,9 +30,7 @@ class DriveTelemetry:
     quat_xyzw: tuple[float, float, float, float] = field(
         default_factory=lambda: (0.0, 0.0, 0.0, 1.0)
     )
-    gyro: tuple[float, float, float] = field(
-        default_factory=lambda: (0.0, 0.0, 0.0)
-    )
+    gyro: tuple[float, float, float] = field(default_factory=lambda: (0.0, 0.0, 0.0))
     left_angle: float = 0.0
     left_vel: float = 0.0
     left_current: float = 0.0
@@ -82,45 +80,6 @@ class StatusData:
     right_wheel_status: int = 0
     left_servo_ok: bool = False
     right_servo_ok: bool = False
-
-
-@dataclass
-class CalibPayload:
-    """Response payload for MSG_CALIB_DATA (read result from device)."""
-
-    target: int = 0
-    gyro_offset: tuple[int, int, int] = field(
-        default_factory=lambda: (0, 0, 0)
-    )
-    accel_offset: tuple[int, int, int] = field(
-        default_factory=lambda: (0, 0, 0)
-    )
-    mag_offset: tuple[int, int, int] = field(
-        default_factory=lambda: (0, 0, 0)
-    )
-
-
-@dataclass
-class WheelCalibPayload:
-    """Response payload for wheel calibration read operations."""
-
-    target: int = 0
-    zero_electric_angle: float = 0.0
-    sensor_direction: int = 0
-
-
-@dataclass
-class WheelTuningPayload:
-    """Response payload for wheel tuning read operations."""
-
-    target: int = 0
-    p: float = 0.1
-    i: float = 0.5
-    d: float = 0.0
-    output_ramp: float = 100.0   # V/s max change rate of PID output
-    lpf_velocity_tf: float = 0.01
-    velocity_limit: float = 40.0
-    voltage_limit: float = 5.0
 
 
 @runtime_checkable
