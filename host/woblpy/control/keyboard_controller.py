@@ -59,5 +59,4 @@ class KeyboardController:
             self._policy.set_velocity_target(0.0, -self._max_yaw)
 
     def _on_release(self, key: pynput.keyboard.Key | pynput.keyboard.KeyCode | None):
-        # Any key released → coast to stop
         self._policy.reset_velocity_target()

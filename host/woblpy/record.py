@@ -25,9 +25,7 @@ Notes
   No additional thread is needed; ``rr.log`` is called inline from your loop.
 - When both ``live=False`` and ``save_path=None`` the recorder is a no-op and
   ``rerun`` is never imported.
-- Timing uses whichever ``t_s`` value the caller provides (seconds).  For IMU
-  data, derive it from ``DriveTelemetry.timestamp_ms`` to use the firmware
-  hardware clock and avoid host-side serial jitter.
+- Timing uses whichever ``t_s`` value the caller provides (seconds).
 """
 
 from __future__ import annotations
@@ -35,8 +33,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from woblpy.control.controller import Controller
-from woblpy.control.datatypes import DriveCommand, DriveTelemetry
+from woblpy.control.motion_controller import MotionController
 
 
 class Recorder:
@@ -80,22 +77,9 @@ class Recorder:
             name="Right Wheel Velocity",
             color=(255, 200, 0),
         )
-        self.configure_series(
-            "wheel/telem/left/current", name="Left Wheel Current", color=(80, 255, 80)
-        )
-        self.configure_series(
-            "wheel/telem/right/current",
-            name="Right Wheel Current",
-            color=(255, 255, 80),
-        )
 
         self.configure_series(
             "controller/fwd_velocity", name="Controller Fwd Vel", color=(255, 160, 0)
-        )
-        self.configure_series(
-            "controller/fwd_velocity_raw",
-            name="Controller Fwd Vel Raw",
-            color=(255, 160, 100),
         )
 
     # ------------------------------------------------------------------
@@ -123,25 +107,29 @@ class Recorder:
     # ------------------------------------------------------------------
 
     def log_controller(
-        self, telem: DriveTelemetry, cmd: DriveCommand, controller: Controller
+        self,
+        obs: dict,
+        controller: MotionController,
+        left_vel: float,
+        right_vel: float,
+        t_s: float,
     ) -> None:
-        """Convenience method to log controller-relevant telemetry and commands."""
+        """Log controller state, wheel commands and raw wheel velocities."""
+        state = controller.state
+        wheel_vel = obs["robot/joint_velocities"]
         self.log_many(
             {
-                "imu/gyro/x": controller.pitch_rate.value,
-                "imu/gyro/y": controller.yaw_rate.value,
-                "imu/attitude/pitch": controller.pitch,
-                "imu/attitude/roll": controller.roll,
-                "wheel/cmd/left/velocity": cmd.left_velocity,
-                "wheel/cmd/right/velocity": cmd.right_velocity,
-                "wheel/telem/left/velocity": telem.left_vel,
-                "wheel/telem/right/velocity": telem.right_vel,
-                "wheel/telem/left/current": telem.left_current,
-                "wheel/telem/right/current": telem.right_current,
-                "controller/fwd_velocity": controller.fwd_velocity.value,
-                "controller/fwd_velocity_raw": controller.fwd_velocity_raw,
+                "imu/gyro/x": state.roll_rate,
+                "imu/gyro/y": state.pitch_rate,
+                "imu/attitude/pitch": state.pitch,
+                "imu/attitude/roll": state.roll,
+                "wheel/cmd/left/velocity": left_vel,
+                "wheel/cmd/right/velocity": right_vel,
+                "wheel/telem/left/velocity": wheel_vel[2],
+                "wheel/telem/right/velocity": wheel_vel[3],
+                "controller/fwd_velocity": state.forward_velocity,
             },
-            t_s=telem.timestamp_ms / 1000.0,
+            t_s=t_s,
         )
 
     def log(self, entity: str, value: float, t_s: float) -> None:
