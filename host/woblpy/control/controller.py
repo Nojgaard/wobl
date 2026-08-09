@@ -1,10 +1,10 @@
 import numpy as np
 
+from woblpy.control.datatypes import DriveCommand, DriveTelemetry
 from woblpy.control.diff_drive_kinematics import DiffDriveKinematics
 from woblpy.control.kalman_filter import KalmanFilter
 from woblpy.control.linear_filter import LinearFilter
 from woblpy.control.lqr import compute_lqr_gains
-from woblpy.hardware.protocol import DriveCommand, DriveTelemetry
 
 
 class Controller:

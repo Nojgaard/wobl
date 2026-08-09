@@ -1,6 +1,7 @@
 import time
+from collections.abc import Callable
 from enum import Enum
-from typing import Callable, cast
+from typing import cast
 
 import dm_env
 import mujoco.viewer
@@ -68,11 +69,17 @@ class Application:
         if self.custom_key_callback is not None:
             self.custom_key_callback(key)
 
-    def launch_headless(self):
-        """Launch the application in headless mode."""
-        while True:
+    def launch_headless(self, max_steps: int | None = None):
+        """Launch the application in headless mode.
+
+        Runs until ``self.running`` is set to False (e.g. by a SIGINT handler)
+        or ``max_steps`` control steps have been executed (useful for smoke tests).
+        """
+        steps = 0
+        while self.running and (max_steps is None or steps < max_steps):
             step_start = time.time()
             self._step()
+            steps += 1
 
             time_until_next_step = self._timestep - (time.time() - step_start)
             if time_until_next_step > 0:

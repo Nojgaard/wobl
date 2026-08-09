@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from woblpy.control.controller import Controller
-from woblpy.hardware.protocol import DriveCommand, DriveTelemetry
+from woblpy.control.datatypes import DriveCommand, DriveTelemetry
 
 
 class Recorder:
@@ -61,20 +61,42 @@ class Recorder:
         self._rr = rr
         rr.init(app_id, spawn=live)
 
-        self.configure_series("imu/gyro/x",         name="Gyro X",   color=(255, 80,  80))
-        self.configure_series("imu/gyro/y",         name="Gyro Y",   color=(80,  255, 80))
-        self.configure_series("imu/attitude/pitch", name="Pitch",    color=(255, 160,  0))
-        self.configure_series("imu/attitude/roll",  name="Roll",     color=(0,   200, 255))
+        self.configure_series("imu/gyro/x", name="Gyro X", color=(255, 80, 80))
+        self.configure_series("imu/gyro/y", name="Gyro Y", color=(80, 255, 80))
+        self.configure_series("imu/attitude/pitch", name="Pitch", color=(255, 160, 0))
+        self.configure_series("imu/attitude/roll", name="Roll", color=(0, 200, 255))
 
-        self.configure_series("wheel/cmd/left/velocity",  name="Left Wheel Cmd Vel",  color=(255, 80,  255))
-        self.configure_series("wheel/cmd/right/velocity", name="Right Wheel Cmd Vel", color=(255, 80,  255))
-        self.configure_series("wheel/telem/left/velocity",  name="Left Wheel Velocity",  color=(80,  80,  255))
-        self.configure_series("wheel/telem/right/velocity", name="Right Wheel Velocity", color=(255, 200, 0))
-        self.configure_series("wheel/telem/left/current",   name="Left Wheel Current",  color=(80,  255, 80))
-        self.configure_series("wheel/telem/right/current",  name="Right Wheel Current", color=(255, 255, 80))
+        self.configure_series(
+            "wheel/cmd/left/velocity", name="Left Wheel Cmd Vel", color=(255, 80, 255)
+        )
+        self.configure_series(
+            "wheel/cmd/right/velocity", name="Right Wheel Cmd Vel", color=(255, 80, 255)
+        )
+        self.configure_series(
+            "wheel/telem/left/velocity", name="Left Wheel Velocity", color=(80, 80, 255)
+        )
+        self.configure_series(
+            "wheel/telem/right/velocity",
+            name="Right Wheel Velocity",
+            color=(255, 200, 0),
+        )
+        self.configure_series(
+            "wheel/telem/left/current", name="Left Wheel Current", color=(80, 255, 80)
+        )
+        self.configure_series(
+            "wheel/telem/right/current",
+            name="Right Wheel Current",
+            color=(255, 255, 80),
+        )
 
-        self.configure_series("controller/fwd_velocity", name="Controller Fwd Vel", color=(255, 160, 0))
-        self.configure_series("controller/fwd_velocity_raw", name="Controller Fwd Vel Raw", color=(255, 160, 100))
+        self.configure_series(
+            "controller/fwd_velocity", name="Controller Fwd Vel", color=(255, 160, 0)
+        )
+        self.configure_series(
+            "controller/fwd_velocity_raw",
+            name="Controller Fwd Vel Raw",
+            color=(255, 160, 100),
+        )
 
     # ------------------------------------------------------------------
     # Configuration helpers
@@ -100,7 +122,9 @@ class Recorder:
     # Logging
     # ------------------------------------------------------------------
 
-    def log_controller(self, telem: DriveTelemetry, cmd: DriveCommand, controller: Controller) -> None:
+    def log_controller(
+        self, telem: DriveTelemetry, cmd: DriveCommand, controller: Controller
+    ) -> None:
         """Convenience method to log controller-relevant telemetry and commands."""
         self.log_many(
             {
@@ -164,6 +188,7 @@ class Recorder:
 # ---------------------------------------------------------------------------
 # Loading
 # ---------------------------------------------------------------------------
+
 
 def load_as_dataframe(path: str | Path, *, timeline: str = "t_s") -> Any:
     """Load an .rrd file saved by :class:`Recorder` into a pandas DataFrame.

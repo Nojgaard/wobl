@@ -1,13 +1,16 @@
-"""Hardware-agnostic data model.
+"""Dataclasses for the sim<->controller contract.
 
 All units follow the firmware convention: radians, rad/s, percent, milliseconds.
 Quaternion order is always (w, x, y, z).
+
+These mirror the firmware wire messages but are used purely as an in-process
+contract between the MuJoCo simulation and the Controller (woblpy is sim-only;
+the real control algorithm runs on the ESP32 firmware).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
 
 from scipy.spatial.transform import Rotation as R
 
@@ -66,38 +69,3 @@ class PoseTelemetry:
     right_pos: float = 0.0
     right_vel: float = 0.0
     right_effort: float = 0.0
-
-
-@dataclass
-class StatusData:
-    """Status received as MSG_STATUS."""
-
-    imu_status: int = 0
-    imu_rate: float = 0.0
-    foc_rate: float = 0.0
-    wheel_rate: float = 0.0
-    left_wheel_status: int = 0
-    right_wheel_status: int = 0
-    left_servo_ok: bool = False
-    right_servo_ok: bool = False
-
-
-@runtime_checkable
-class Hardware(Protocol):
-    """Protocol implemented by both WoblSerial and WoblSim."""
-
-    def step_drive(self, cmd: DriveCommand) -> DriveTelemetry:
-        """Send a drive command and return the resulting telemetry."""
-        ...
-
-    def step_pose(self, cmd: PoseCommand) -> PoseTelemetry:
-        """Send a pose command and return the resulting telemetry."""
-        ...
-
-    def request_status(self) -> StatusData:
-        """Request and return a hardware status snapshot."""
-        ...
-
-    def close(self) -> None:
-        """Release resources."""
-        ...

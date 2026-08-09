@@ -1,63 +1,70 @@
+"""Bringup script for the WOBL robot simulation.
+
+The control loop runs in the main thread: the MuJoCo Application queries the
+sim state each step and feeds it into the Controller via ControlPolicy.  The
+only background thread is the pynput keyboard listener (input-only), which
+writes velocity targets that the policy applies on the next main tick.
+"""
+
 import argparse
 import signal
-import sys
 
-from woblpy.control.controller_loop import ControllerLoop
+from woblpy.control.control_policy import ControlPolicy
 from woblpy.control.keyboard_controller import KeyboardController
-from woblpy.hardware.wobl_sim import WoblSim
 from woblpy.record import Recorder
+from woblpy.sim.application import Application
+from woblpy.sim.robot import Robot, RobotWorld
+
+_DEFAULT_RECORD_PATH = "data/bringup.rrd"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bringup script for WOBL robot")
-    parser.add_argument("mode", choices=["real", "sim"])
-    parser.add_argument(
-        "--port",
-        default=None,
-        help="Serial port for real mode (auto-detected if omitted)",
-    )
     parser.add_argument(
         "--headless",
         action="store_true",
         help="Run sim without the MuJoCo viewer",
     )
     parser.add_argument(
-        "--record", action="store_true", help="Record telemetry to data/bringup.rrd"
+        "--record",
+        action="store_true",
+        help="Record telemetry to a .rrd file",
+    )
+    parser.add_argument(
+        "--save",
+        default=_DEFAULT_RECORD_PATH,
+        help=f"Output path for --record (default: {_DEFAULT_RECORD_PATH})",
     )
     args = parser.parse_args()
 
-    hardware = WoblSim(with_viewer=not args.headless)
-
     recorder = (
-        Recorder("record", save_path="data/bringup.rrd", live=False)
-        if args.record
-        else None
+        Recorder("bringup", save_path=args.save, live=False) if args.record else None
     )
-    loop = ControllerLoop(hardware, recorder=recorder)
-    kbd = KeyboardController(loop, max_fwd=0.3, max_yaw=1.0)
+    policy = ControlPolicy(recorder=recorder)
+
+    robot = Robot()
+    world = RobotWorld(robot)
+    # 100 Hz control rate matches the Controller's assumed dt; 200 Hz physics.
+    world.set_timesteps(control_timestep=0.010, physics_timestep=0.005)
+    app = Application(world, policy)
+
+    kbd = KeyboardController(policy, max_fwd=0.3, max_yaw=1.0)
     kbd.start()
 
     def _shutdown(sig: int, frame: object) -> None:
         print(f"\nReceived signal {sig}, shutting down…")
-        loop.stop()
-        hardware.close()
-        kbd.stop()
-        if recorder is not None:
-            recorder.close()
-        sys.exit(0)
+        app.running = False
 
     signal.signal(signal.SIGINT, _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
 
     try:
-        if isinstance(hardware, WoblSim) and not args.headless:
-            loop.start()
-            hardware.app.launch()
-            loop.stop()
+        if args.headless:
+            app.launch_headless()
         else:
-            loop.run()
+            app.launch()
     finally:
-        hardware.close()
+        kbd.stop()
         if recorder is not None:
             recorder.close()
 
