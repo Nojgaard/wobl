@@ -38,7 +38,7 @@ void doTarget(char *cmd) {
 void printKV(char *) {
   float omL = motorLeft.shaft_velocity;
   float omR = motorRight.shaft_velocity;
-  float kv = 30.0f / (PI * targetVoltage);
+  float kv = 30.0f / (PI * targetVoltage * _SQRT3);
   Serial.printf("left   omega=%6.1f rad/s  KV=%.1f rpm/V\r\n", omL, omL * kv);
   Serial.printf("right  omega=%6.1f rad/s  KV=%.1f rpm/V\r\n", omR, omR * kv);
 }
@@ -96,7 +96,7 @@ void setup() {
 static uint32_t lastPrint = 0;
 
 void loop() {
-  /*motorLeft.loopFOC();
+  motorLeft.loopFOC();
   motorLeft.move(targetVoltage);
   motorRight.loopFOC();
   motorRight.move(targetVoltage);
@@ -105,7 +105,5 @@ void loop() {
   if (millis() - lastPrint >= 2000) {
     lastPrint = millis();
     printKV(nullptr);
-  }*/
-
-  delay(1000);
+  }
 }
