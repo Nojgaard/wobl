@@ -37,7 +37,7 @@ def compute_lqr_gains():
     K = K[0]
 
     # [k_pitch, k_pitch_rate, k_velocity, k_position]
-    return np.array([K[2], K[3], K[1], K[0]])
+    return np.array([K[2], K[3], K[1], K[0]]) / 12
 
 
 if __name__ == "__main__":

@@ -39,10 +39,10 @@ def main() -> None:
     robot = Robot()
     world = RobotWorld(robot)
     # 100 Hz control rate matches the Controller's assumed dt; 200 Hz physics.
-    world.set_timesteps(control_timestep=0.010, physics_timestep=0.005)
+    world.set_timesteps(control_timestep=0.010, physics_timestep=0.001)
     app = Application(world, policy)
 
-    kbd = KeyboardController(policy, max_fwd=0.3, max_yaw=1.0)
+    kbd = KeyboardController(policy, max_fwd=0.3, max_yaw=0.6 / 11.9)
     kbd.start()
 
     def _shutdown(sig: int, frame: object) -> None:

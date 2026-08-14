@@ -11,6 +11,9 @@
         <default class="mirror">
             <mesh scale="-0.001 0.001 0.001" />
         </default>
+        <default class="wheel_joint">
+            <joint armature="1.5e-5" damping="1e-3" frictionloss="2e-3" />
+        </default>
     </default>
     <asset>
         <mesh name="bat_cap" file="Back Battery Cap.stl" />
@@ -66,7 +69,7 @@
                         </body>
                         <body name="R_foot">
                             <geom mesh="R_shin_servo" mass="0.063" />
-                            <joint name="R_foot" pos="-0.019 -0.000496 -0.154963" />
+                            <joint name="R_foot" pos="-0.019 -0.000496 -0.154963" class="wheel_joint" />
                             <geom mesh="R_foot" mass="0.061" contype="0" conaffinity="0" />
                             <geom pos="-0.045 -0.000496 -0.154963" mass="0" class="foot_collider" />
                         </body>
@@ -89,7 +92,7 @@
                         </body>
                         <body name="L_foot">
                             <geom mesh="L_shin_servo" mass="0.063" />
-                            <joint name="L_foot" pos="-0.019 -0.000496 -0.154963" />
+                            <joint name="L_foot" pos="-0.019 -0.000496 -0.154963" class="wheel_joint" />
                             <geom mesh="L_foot" mass="0.061" contype="0" conaffinity="0" />
                             <geom pos="0.045 -0.000496 -0.154963" mass="0" class="foot_collider" />
                         </body>
@@ -134,10 +137,10 @@
         
 
         <motor name="L_foot" joint="L_foot"
-            ctrllimited="true" ctrlrange="-1.96 1.96"
+            ctrllimited="true" ctrlrange="-0.1 0.1"
             gear="1" />
         <motor name="R_foot" joint="R_foot"
-            ctrllimited="true" ctrlrange="-1.96 1.96"
+            ctrllimited="true" ctrlrange="-0.1 0.1"
             gear="1" />
     </actuator>
     <sensor>

@@ -10,7 +10,7 @@ static constexpr Wheel::Config leftWheelConfig{
     .pinEnable = 13,
     .polePairs = 11,
     .phaseResistance = 5.7f / 2.0f,
-    .kvRating = 170.0f,
+    .kvRating = 100.0f,
     .zero_electric_angle = 0.81,
     .sensor_direction = Direction::CCW,
 };
@@ -23,7 +23,7 @@ static constexpr Wheel::Config rightWheelConfig{
     .pinEnable = 2,
     .polePairs = 11,
     .phaseResistance = 5.7f / 2.0f,
-    .kvRating = 170.0f,
+    .kvRating = 100.0f,
     .zero_electric_angle = 6.08,
     .sensor_direction = Direction::CW,
 };
