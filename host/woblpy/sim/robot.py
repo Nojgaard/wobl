@@ -16,10 +16,22 @@ class Robot(Entity):
 
     def _build(self):
         self._model = mjcf.from_path(self._model_path)
-        self.joint_names = ["L_hip", "R_hip", "L_foot", "R_foot"]
-        self.mjcf_joints = [
-            self.mjcf_model.find("joint", name) for name in self.joint_names
+        self.actuator_joint_names = ["L_hip", "R_hip", "L_foot", "R_foot"]
+        self.mjcf_actuator_joints = [
+            self.mjcf_model.find("joint", name) for name in self.actuator_joint_names
         ]
+
+        leg_joint_names = ["L_hip", "L_shin", "L_link", "L_foot"]
+        leg_joints = [self.mjcf_model.find("joint", name) for name in leg_joint_names]
+
+        eq_joint = self.mjcf_model.find("equality", "eq_constraint_L")
+        self.leg_keypoints = {
+            "hip": leg_joints[0].pos[1:],  # type: ignore
+            "knee": leg_joints[1].pos[1:],  # type: ignore
+            "wheel": leg_joints[3].pos[1:],  # type: ignore
+            "link": leg_joints[2].pos[1:],  # type: ignore
+            "anchor": eq_joint.anchor[1:],  # type: ignore
+        }
 
     @property
     def mjcf_model(self):
@@ -38,11 +50,11 @@ class RobotObservables(Observables):
 
     @composer.observable
     def joint_positions(self):
-        return observable.MJCFFeature("qpos", self._entity.mjcf_joints)
+        return observable.MJCFFeature("qpos", self._entity.mjcf_actuator_joints)
 
     @composer.observable
     def joint_velocities(self):
-        return observable.MJCFFeature("qvel", self._entity.mjcf_joints)
+        return observable.MJCFFeature("qvel", self._entity.mjcf_actuator_joints)
 
     @composer.observable
     def joint_efforts(self):

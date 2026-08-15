@@ -34,10 +34,12 @@ def main() -> None:
     recorder = (
         Recorder("bringup", save_path=args.save, live=False) if args.record else None
     )
-    policy = ControlPolicy(recorder=recorder)
 
     robot = Robot()
     world = RobotWorld(robot)
+
+    policy = ControlPolicy(robot, recorder)
+
     # 100 Hz control rate matches the Controller's assumed dt; 200 Hz physics.
     world.set_timesteps(control_timestep=0.010, physics_timestep=0.001)
     app = Application(world, policy)

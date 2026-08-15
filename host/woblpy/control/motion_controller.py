@@ -5,12 +5,17 @@ from typing import Any
 
 import numpy as np
 
+from woblpy.control.leg_kinematics import LegKinematics
 from woblpy.control.lqr import compute_lqr_gains
 from woblpy.control.observer import Observer
+from woblpy.sim.robot import Robot
 
 
 class MotionController:
-    def __init__(self, pitch_offset: float = 0.07) -> None:
+    _MIN_HEIGHT = 0.06
+    _MAX_HEIGHT = 0.16
+
+    def __init__(self, robot: Robot, pitch_offset: float = 0.07) -> None:
         gains = compute_lqr_gains()
         self._pitch_kp = float(gains[0])
         self._pitch_rate_kp = float(gains[1])
@@ -26,9 +31,24 @@ class MotionController:
         self.turn_velocity = 0.0  # target turn velocity (rad/s)
         self.state = Observer.State()  # latest observer state
 
-    def update(self, obs: Mapping[str, Any], dt: float) -> tuple[float, float]:
+        self._leg_ik = LegKinematics(robot.leg_keypoints)
+        self.target_height = self._leg_ik.to_height(0.1)
+
+    @property
+    def target_height(self) -> float:
+        return self._target_height
+
+    @target_height.setter
+    def target_height(self, height: float) -> None:
+        self._target_height = float(np.clip(height, self._MIN_HEIGHT, self._MAX_HEIGHT))
+
+    def update(
+        self, obs: Mapping[str, Any], dt: float
+    ) -> tuple[float, float, float, float]:
         self.state = self.observer.update(obs, dt)
-        return self._balance(self.state, dt)
+        ctrl_left, ctrl_right = self._balance(self.state, dt)
+        hip_angle = float(self._leg_ik.to_angle(self.target_height))
+        return hip_angle, hip_angle, ctrl_left, ctrl_right
 
     def _balance(self, state: Observer.State, dt: float) -> tuple[float, float]:
         pitch_error = state.pitch - self._pitch_offset
