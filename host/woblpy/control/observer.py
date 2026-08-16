@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from woblpy.control.leg_kinematics import LegKinematics
 from woblpy.control.low_pass_filter import LowPassFilter
 
 
@@ -28,8 +29,10 @@ class Observer:
         pitch_rate: float = 0.0
         forward_velocity: float = 0.0
         turn_velocity: float = 0.0
+        height: float = 0.0
 
-    def __init__(self) -> None:
+    def __init__(self, leg_ik: LegKinematics) -> None:
+        self._leg_ik = leg_ik
         self._roll_rate = LowPassFilter(0.0)
         self._pitch_rate = LowPassFilter(0.0)
         self._left_wheel_velocity = LowPassFilter(0.0)
@@ -46,9 +49,12 @@ class Observer:
         )
 
         gyro = obs["robot/angular_velocity"]
-        wheel_vel = obs["robot/joint_velocities"]
-        lv = self._left_wheel_velocity(wheel_vel[2], dt)
-        rv = self._right_wheel_velocity(wheel_vel[3], dt)
+        joint_pos = obs["robot/joint_positions"]
+        joint_vel = obs["robot/joint_velocities"]
+        lv = self._left_wheel_velocity(joint_vel[2], dt)
+        rv = self._right_wheel_velocity(joint_vel[3], dt)
+
+        leg_heights = [self._leg_ik.to_height(p) for p in joint_pos[0:2]]
 
         self._state = self.State(
             roll=roll,
@@ -57,5 +63,6 @@ class Observer:
             pitch_rate=self._pitch_rate(gyro[1], dt),
             forward_velocity=(lv + rv) / 2.0 * self._WHEEL_RADIUS,
             turn_velocity=(rv - lv) / self._WHEEL_BASE * self._WHEEL_RADIUS,
+            height=(leg_heights[0] + leg_heights[1]) / 2.0,
         )
         return self._state

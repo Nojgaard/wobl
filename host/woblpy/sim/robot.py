@@ -33,6 +33,16 @@ class Robot(Entity):
             "anchor": eq_joint.anchor[1:],  # type: ignore
         }
 
+    def com(self, physics: mjcf.Physics) -> np.ndarray:
+        """Center of mass relative to the wheel axle, in world coordinates."""
+        robot_body = self.mjcf_model.find("body", "body")
+        com = np.asarray(physics.bind(robot_body).subtree_com, dtype=float)
+
+        left = physics.bind(self.mjcf_model.find("joint", "L_foot")).xanchor
+        right = physics.bind(self.mjcf_model.find("joint", "R_foot")).xanchor
+        wheel_axle = 0.5 * (left + right)
+        return com - wheel_axle
+
     @property
     def mjcf_model(self):
         return self._model
@@ -59,6 +69,10 @@ class RobotObservables(Observables):
     @composer.observable
     def joint_efforts(self):
         return observable.Generic(lambda physics: physics.data.actuator_force)
+
+    @composer.observable
+    def com(self):
+        return observable.Generic(lambda physics: self._entity.com(physics))
 
     @composer.observable
     def angular_velocity(self):
@@ -118,6 +132,7 @@ class RobotWorld(Task):
         self.robot.observables.linear_acceleration.delay = 1
 
         self.robot.observables.linear_acceleration.enabled = True
+        self.robot.observables.com.enabled = True
 
     def initialize_episode(self, physics: Physics, random_state):
         self.robot.set_pose(physics, np.array([0, 0, 0.24]), np.array([1, 0, 0, 0]))

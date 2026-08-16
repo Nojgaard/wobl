@@ -104,9 +104,9 @@
     </worldbody>
     <equality>
         <connect anchor="-0.019 0.033083 0.033665" body1="body" body2="R_link"
-            name="eq_constraint_R" />
+            name="eq_constraint_R" solref="0.01 1" solimp="0.999 0.9999 0.0001 0.5 2" />
         <connect anchor="-0.019 0.033083 0.033665" body1="body" body2="L_link"
-            name="eq_constraint_L" />
+            name="eq_constraint_L" solref="0.01 1" solimp="0.999 0.9999 0.0001 0.5 2" />
     </equality>
     <contact>
         <exclude body1="R_link" body2="R_leg" />
