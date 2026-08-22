@@ -19,7 +19,9 @@ b    a
 
 
 class LegKinematics:
-    def __init__(self, leg_keypoints: dict[str, npt.NDArray]) -> None:
+    def __init__(
+        self, leg_keypoints: dict[str, npt.NDArray], angle_range: tuple[float, float]
+    ) -> None:
         a = leg_keypoints["hip"]
         b = leg_keypoints["anchor"]
         c = leg_keypoints["link"]
@@ -32,6 +34,12 @@ class LegKinematics:
         self._ad = np.linalg.norm(a - d)
         self._de = np.linalg.norm(d - e)
         self._angle_offset = 1.74833122
+
+        self.angle_range = angle_range
+        self.height_range = (
+            self.to_height(angle_range[1]),
+            self.to_height(angle_range[0]),
+        )
 
     def _tri_edge_length(self, a, b, theta):
         return np.sqrt(a**2 + b**2 - 2 * a * b * np.cos(theta))
@@ -56,7 +64,8 @@ class LegKinematics:
 
         return ae
 
-    def to_angle(self, height):
+    def to_angle(self, height: float) -> float:
+        height = float(np.clip(height, *self.height_range))
         ab = self._ab
         bc = self._bc
         cd = self._cd
@@ -69,14 +78,17 @@ class LegKinematics:
         theta_c = self._tri_angle(ca, ab, bc)
         theta_d = self._tri_angle(ca, ad, cd)
 
-        return self._angle_offset - theta_c - theta_d
+        angle = self._angle_offset - theta_c - theta_d
+        return angle
 
 
 if __name__ == "__main__":
     from woblpy.sim.robot import Robot
 
     robot = Robot()
-    kin = LegKinematics(robot.leg_keypoints)
+    kin = LegKinematics(robot.leg_keypoints, robot.servo_limits())
+
+    print("Angle Range:", kin.angle_range)
     print("Nominal Height:", kin.to_height(0.1))
     print("Nominal Angle:", kin.to_angle(0.1431165062317346))
     print("Max Height:", kin.to_height(-0.20))

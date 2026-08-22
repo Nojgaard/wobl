@@ -37,6 +37,7 @@ class ControlPolicy:
         if now - self._last_print_time > 0.2:
             print(
                 f"Pitch: {self.controller.state.pitch:.3f}, "
+                f"Roll: {self.controller.state.roll:.3f}, "
                 f"Height: {self.controller.state.height:.3f}, "
                 f"Pitch Offset: {pitch_equilibrium.from_height(self.controller.state.height):.3f}, "
             )

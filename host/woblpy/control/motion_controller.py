@@ -22,10 +22,10 @@ class MotionController:
         self._velocity_kp = float(gains[2])
         self._position_kp = float(gains[3])
 
-        self._leg_ik = LegKinematics(robot.leg_keypoints)
+        self._leg_ik = LegKinematics(robot.leg_keypoints, robot.servo_limits())
         self.target = TargetState(self._leg_ik)
 
-        self._pid = PID(Kp=1.0, Ki=0.1, Kd=0.05, setpoint=0.0)
+        self._pid_pose = PID(Kp=1.0, Ki=0.0, Kd=0.1)
 
         self._position_error = 0.0
         self.state = State(self._leg_ik)
@@ -34,9 +34,23 @@ class MotionController:
         self, obs: Mapping[str, Any], dt: float
     ) -> tuple[float, float, float, float]:
         self.state.update(obs, dt)
-        ctrl_left, ctrl_right = self._balance(self.state, dt)
-        hip_angle = float(self._leg_ik.to_angle(self.target.height))
-        return hip_angle, hip_angle, ctrl_left, ctrl_right
+        left_wheel, right_wheel = self._balance(self.state, dt)
+
+        left_hip, right_hip = self._pose(dt)
+        return left_hip, right_hip, left_wheel, right_wheel
+
+    def _pose(self, dt: float) -> tuple[float, float]:
+        state = self.state
+
+        left_leg_height = self.target.height
+        right_leg_height = self.target.height
+
+        self._pid_pose.setpoint = self.target.roll
+        ctrl_roll: float = self._pid_pose(state.roll, dt=dt)  # type: ignore
+
+        left_angle = self._leg_ik.to_angle(left_leg_height + ctrl_roll)
+        right_angle = self._leg_ik.to_angle(right_leg_height - ctrl_roll)
+        return (left_angle, right_angle)
 
     def _balance(self, state: State, dt: float) -> tuple[float, float]:
         self._pitch_offset = pitch_equilibrium.from_height(state.height)

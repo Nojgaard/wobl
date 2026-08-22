@@ -43,6 +43,11 @@ class Robot(Entity):
         wheel_axle = 0.5 * (left + right)
         return com - wheel_axle
 
+    def servo_limits(self) -> tuple[float, float]:
+        """Return the min/max servo angles in radians."""
+        actuator = self.mjcf_model.find("actuator", "L_hip")
+        return (float(actuator.ctrlrange[0]), float(actuator.ctrlrange[1]))  # type: ignore
+
     @property
     def mjcf_model(self):
         return self._model
