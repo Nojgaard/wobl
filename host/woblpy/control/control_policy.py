@@ -34,12 +34,14 @@ class ControlPolicy:
 
         now = time.time()
         if now - self._last_print_time > 0.2:
+            state = self.controller.state
+            mean_height = (state.left_height + state.right_height) / 2.0
             print(
-                f"Pitch: {self.controller.state.pitch:.3f}, "
-                f"Roll: {self.controller.state.roll:.3f}, "
-                f"Height: {self.controller.state.height:.3f}, "
-                f"Vel:  {self.controller.state.forward_velocity:.3f}, "
-                f"Turn: {self.controller.state.turn_velocity:.3f}, "
+                f"Pitch: {state.pitch:.3f}, "
+                f"Roll: {state.roll:.3f}, "
+                f"Height: {mean_height:.3f}, "
+                f"Vel:  {state.forward_velocity:.3f}, "
+                f"Turn: {state.turn_velocity:.3f}, "
             )
             self._last_print_time = now
 

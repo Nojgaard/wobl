@@ -23,7 +23,8 @@ class State:
     pitch_rate: float = 0.0
     forward_velocity: float = 0.0
     turn_velocity: float = 0.0
-    height: float = 0.0
+    left_height: float = 0.0
+    right_height: float = 0.0
 
     _WHEEL_BASE = 0.3  # meters
     _WHEEL_RADIUS = 0.04  # meters
@@ -53,5 +54,6 @@ class State:
         self.turn_velocity = (
             (right_velocity - left_velocity) / self._WHEEL_BASE * self._WHEEL_RADIUS
         )
-        self.height = (leg_heights[0] + leg_heights[1]) / 2.0
+        self.left_height = leg_heights[0]
+        self.right_height = leg_heights[1]
         return self

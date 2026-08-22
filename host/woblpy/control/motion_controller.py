@@ -24,8 +24,8 @@ class MotionController:
         self._leg_ik = LegKinematics(robot.leg_keypoints, robot.servo_limits())
         self.target = TargetState(self._leg_ik)
 
-        self._roll_kp = 0.15
-        self._roll_kd = 0.01
+        self._roll_kp = 0.3
+        self._roll_kd = 0.1
 
         self._yaw_rate_kp = 0.5
         self._yaw_rate_ki = 0.5
@@ -52,7 +52,11 @@ class MotionController:
     def _pose(self, dt: float) -> tuple[float, float]:
         state = self.state
 
+        obs_dh = state.left_height - state.right_height
+        terrain_dh = self._wheel_seperation * np.sin(state.roll) - obs_dh
+
         hff = self._wheel_seperation * np.sin(self.target.roll)
+        hff -= terrain_dh
 
         roll_error = self.target.roll - state.roll
         dh = hff + self._roll_kp * roll_error - self._roll_kd * state.roll_rate
@@ -64,7 +68,8 @@ class MotionController:
         return (left_angle, right_angle)
 
     def _balance(self, state: State, dt: float) -> tuple[float, float]:
-        self._pitch_offset = pitch_equilibrium.from_height(state.height)
+        mean_height = (state.left_height + state.right_height) / 2.0
+        self._pitch_offset = pitch_equilibrium.from_height(mean_height)
         pitch_error = state.pitch - self._pitch_offset
         velocity_error = state.forward_velocity - self.target.forward_velocity
 
