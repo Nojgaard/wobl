@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
-from simple_pid import PID
 
 from woblpy.control import pitch_equilibrium
 from woblpy.control.leg_kinematics import LegKinematics
@@ -25,15 +24,20 @@ class MotionController:
         self._leg_ik = LegKinematics(robot.leg_keypoints, robot.servo_limits())
         self.target = TargetState(self._leg_ik)
 
-        self._pid_pose = PID(Kp=1.0, Ki=0.0, Kd=0.1)
+        self._roll_kp = 0.05
+        self._roll_kd = 0.01
 
         self._position_error = 0.0
         self.state = State(self._leg_ik)
+
+        self._wheel_seperation = robot.wheel_seperation()
 
     def update(
         self, obs: Mapping[str, Any], dt: float
     ) -> tuple[float, float, float, float]:
         self.state.update(obs, dt)
+        self.target.update(dt)
+
         left_wheel, right_wheel = self._balance(self.state, dt)
 
         left_hip, right_hip = self._pose(dt)
@@ -42,14 +46,15 @@ class MotionController:
     def _pose(self, dt: float) -> tuple[float, float]:
         state = self.state
 
-        left_leg_height = self.target.height
-        right_leg_height = self.target.height
+        hff = self._wheel_seperation * np.sin(self.target.roll_command)
 
-        self._pid_pose.setpoint = self.target.roll
-        ctrl_roll: float = self._pid_pose(state.roll, dt=dt)  # type: ignore
+        roll_error = self.target.roll_command - state.roll
+        dh = hff + self._roll_kp * roll_error - self._roll_kd * state.roll_rate
+        left_leg_height = self.target.height + 0.5 * dh
+        right_leg_height = self.target.height - 0.5 * dh
 
-        left_angle = self._leg_ik.to_angle(left_leg_height + ctrl_roll)
-        right_angle = self._leg_ik.to_angle(right_leg_height - ctrl_roll)
+        left_angle = self._leg_ik.to_angle(left_leg_height)
+        right_angle = self._leg_ik.to_angle(right_leg_height)
         return (left_angle, right_angle)
 
     def _balance(self, state: State, dt: float) -> tuple[float, float]:

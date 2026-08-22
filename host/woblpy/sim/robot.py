@@ -48,6 +48,10 @@ class Robot(Entity):
         actuator = self.mjcf_model.find("actuator", "L_hip")
         return (float(actuator.ctrlrange[0]), float(actuator.ctrlrange[1]))  # type: ignore
 
+    def wheel_seperation(self) -> float:
+        """Return the distance between the left and right wheel axles."""
+        return 0.2058
+
     @property
     def mjcf_model(self):
         return self._model
@@ -148,3 +152,8 @@ class RobotWorld(Task):
 
     def get_reward(self, physics: Physics):
         return 0
+
+
+if __name__ == "__main__":
+    robot = Robot()
+    print(robot.wheel_seperation())
