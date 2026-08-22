@@ -5,7 +5,7 @@
         <geom type="mesh" />
         <joint damping="0.02" armature="0.05" frictionloss="0.01" axis="1 0 0" />
         <default class="foot_collider">
-            <geom type="cylinder" quat="0.7071 0 0.7071 0" size="0.04 0.018" rgba="1 0 0 0.5"
+            <geom type="cylinder" quat="0.7071 0 0.7071 0" size="0.04 0.014" rgba="1 0 0 0.5"
                 contype="1" conaffinity="1" />
         </default>
         <default class="mirror">

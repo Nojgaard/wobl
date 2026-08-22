@@ -41,26 +41,26 @@ class KeyboardController:
         if isinstance(key, pynput.keyboard.KeyCode):
             return  # ignore non-special keys
 
+        target = self._policy.controller.target
         if key.name == "up":
-            self._policy.controller.forward_velocity = self._max_fwd
+            target.forward_velocity = self._max_fwd
         elif key.name == "down":
-            self._policy.controller.forward_velocity = -self._max_fwd
+            target.forward_velocity = -self._max_fwd
         elif key.name == "left":
-            self._policy.controller.turn_velocity = -self._max_yaw
+            target.turn_velocity = -self._max_yaw
         elif key.name == "right":
-            self._policy.controller.turn_velocity = self._max_yaw
+            target.turn_velocity = self._max_yaw
         elif key.name == "page_up":
-            controller = self._policy.controller
-            controller.target_height += self._height_step
+            target.height += self._height_step
         elif key.name == "page_down":
-            controller = self._policy.controller
-            controller.target_height -= self._height_step
+            target.height -= self._height_step
 
     def _on_release(self, key: pynput.keyboard.Key | pynput.keyboard.KeyCode | None):
         if key is None or isinstance(key, pynput.keyboard.KeyCode):
             return
 
+        target = self._policy.controller.target
         if key.name in ["up", "down"]:
-            self._policy.controller.forward_velocity = 0
+            target.forward_velocity = 0
         elif key.name in ["left", "right"]:
-            self._policy.controller.turn_velocity = 0
+            target.turn_velocity = 0
