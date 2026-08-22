@@ -51,9 +51,9 @@ class KeyboardController:
         elif key.name == "down":
             target.forward_velocity = -self._max_fwd
         elif key.name == "left":
-            target.turn_velocity = -self._max_yaw
-        elif key.name == "right":
             target.turn_velocity = self._max_yaw
+        elif key.name == "right":
+            target.turn_velocity = -self._max_yaw
         elif key.name == "page_up":
             target.height += self._height_step
         elif key.name == "page_down":

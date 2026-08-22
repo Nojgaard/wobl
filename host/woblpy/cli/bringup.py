@@ -44,7 +44,8 @@ def main() -> None:
     world.set_timesteps(control_timestep=0.010, physics_timestep=0.001)
     app = Application(world, policy)
 
-    kbd = KeyboardController(policy, max_fwd=0.3, max_yaw=0.6 / 11.9)
+    # kbd = KeyboardController(policy, max_fwd=0.3, max_yaw=0.6 / 11.9)
+    kbd = KeyboardController(policy, max_fwd=0.3, max_yaw=2.0)
     kbd.start()
 
     def _shutdown(sig: int, frame: object) -> None:

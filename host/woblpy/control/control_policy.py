@@ -5,7 +5,6 @@ import time
 import numpy as np
 from dm_env import TimeStep
 
-from woblpy.control import pitch_equilibrium
 from woblpy.control.motion_controller import MotionController
 from woblpy.record import Recorder
 from woblpy.sim.robot import Robot
@@ -39,7 +38,7 @@ class ControlPolicy:
                 f"Pitch: {self.controller.state.pitch:.3f}, "
                 f"Roll: {self.controller.state.roll:.3f}, "
                 f"Height: {self.controller.state.height:.3f}, "
-                f"Pitch Offset: {pitch_equilibrium.from_height(self.controller.state.height):.3f}, "
+                f"Turn: {self.controller.state.turn_velocity:.3f}, "
             )
             self._last_print_time = now
 

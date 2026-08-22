@@ -5,8 +5,9 @@ from dm_control import composer, mjcf
 from dm_control.composer import Entity, Observables, Task
 from dm_control.composer.observation import observable
 from dm_control.composer.variation import distributions, noises
-from dm_control.locomotion.arenas import Floor
 from dm_control.mujoco import Physics
+
+from woblpy.sim.stability_arena import StabilityArena
 
 
 class Robot(Entity):
@@ -116,7 +117,8 @@ class RobotWorld(Task):
     def __init__(self, robot: Robot, static_entity=False):
         super().__init__()
         self.robot = robot
-        self._arena = Floor(reflectance=0.0)
+        # self._arena = Floor(reflectance=0.0)
+        self._arena = StabilityArena()
         if static_entity:
             self._arena.attach(self.robot)
         else:

@@ -24,8 +24,12 @@ class MotionController:
         self._leg_ik = LegKinematics(robot.leg_keypoints, robot.servo_limits())
         self.target = TargetState(self._leg_ik)
 
-        self._roll_kp = 0.05
+        self._roll_kp = 0.15
         self._roll_kd = 0.01
+
+        self._yaw_rate_kp = 0.5
+        self._yaw_rate_ki = 0.5
+        self._yaw_rate_integral = 0.0
 
         self._position_error = 0.0
         self.state = State(self._leg_ik)
@@ -38,7 +42,10 @@ class MotionController:
         self.state.update(obs, dt)
         self.target.update(dt)
 
-        left_wheel, right_wheel = self._balance(self.state, dt)
+        balance_left, balance_right = self._balance(self.state, dt)
+        turn_left, turn_right = self._turn(self.state, dt)
+        left_wheel = balance_left + turn_left
+        right_wheel = balance_right + turn_right
 
         left_hip, right_hip = self._pose(dt)
         return left_hip, right_hip, left_wheel, right_wheel
@@ -72,6 +79,21 @@ class MotionController:
             - self._velocity_kp * velocity_error
         )
 
-        ctrl_left = ctrl_fwd_vel + self.target.turn_velocity
-        ctrl_right = ctrl_fwd_vel - self.target.turn_velocity
-        return ctrl_left, ctrl_right
+        return ctrl_fwd_vel, ctrl_fwd_vel
+
+    def _turn(self, state: State, dt: float) -> tuple[float, float]:
+        yaw_rate_error = self.target.turn_velocity - state.turn_velocity
+        self._yaw_rate_integral += yaw_rate_error * dt
+        self._yaw_rate_integral = float(
+            np.clip(
+                self._yaw_rate_integral,
+                -0.05,
+                0.05,
+            )
+        )
+        ctrl_turn = (
+            self._yaw_rate_kp * yaw_rate_error
+            + self._yaw_rate_ki * self._yaw_rate_integral
+        )
+
+        return -ctrl_turn, ctrl_turn
