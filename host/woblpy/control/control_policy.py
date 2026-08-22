@@ -38,6 +38,7 @@ class ControlPolicy:
                 f"Pitch: {self.controller.state.pitch:.3f}, "
                 f"Roll: {self.controller.state.roll:.3f}, "
                 f"Height: {self.controller.state.height:.3f}, "
+                f"Vel:  {self.controller.state.forward_velocity:.3f}, "
                 f"Turn: {self.controller.state.turn_velocity:.3f}, "
             )
             self._last_print_time = now

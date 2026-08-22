@@ -8,8 +8,8 @@ class TargetState:
 
     _HEIGHT_RANGE = (0.06, 0.16)
     _ROLL_RANGE = (-0.3, 0.3)
-    _FORWARD_VELOCITY_RANGE = (-0.3, 0.3)
-    _TURN_VELOCITY_RANGE = (-1.0, 1.0)
+    _FORWARD_VELOCITY_RANGE = (-0.5, 0.5)
+    _TURN_VELOCITY_RANGE = (-5.0, 5.0)
 
     def __init__(self, leg_ik: LegKinematics):
         self._height: float = leg_ik.to_height(0)

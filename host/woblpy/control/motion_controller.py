@@ -86,10 +86,13 @@ class MotionController:
         self._yaw_rate_integral = float(
             np.clip(
                 self._yaw_rate_integral,
-                -0.05,
-                0.05,
+                -0.2,
+                0.2,
             )
         )
+        # print(
+        #    f"S: {state.turn_velocity:3f} T: {self.target.turn_velocity:3f} E: {yaw_rate_error:3f}, I {self._yaw_rate_integral:3f}"
+        # )
         ctrl_turn = (
             self._yaw_rate_kp * yaw_rate_error
             + self._yaw_rate_ki * self._yaw_rate_integral
