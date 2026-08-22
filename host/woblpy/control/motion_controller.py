@@ -40,7 +40,6 @@ class MotionController:
         self, obs: Mapping[str, Any], dt: float
     ) -> tuple[float, float, float, float]:
         self.state.update(obs, dt)
-        self.target.update(dt)
 
         balance_left, balance_right = self._balance(self.state, dt)
         turn_left, turn_right = self._turn(self.state, dt)
@@ -53,9 +52,9 @@ class MotionController:
     def _pose(self, dt: float) -> tuple[float, float]:
         state = self.state
 
-        hff = self._wheel_seperation * np.sin(self.target.roll_command)
+        hff = self._wheel_seperation * np.sin(self.target.roll)
 
-        roll_error = self.target.roll_command - state.roll
+        roll_error = self.target.roll - state.roll
         dh = hff + self._roll_kp * roll_error - self._roll_kd * state.roll_rate
         left_leg_height = self.target.height + 0.5 * dh
         right_leg_height = self.target.height - 0.5 * dh
