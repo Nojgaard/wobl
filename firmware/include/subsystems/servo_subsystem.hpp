@@ -4,6 +4,8 @@
 
 class ServoSubsystem {
 public:
+  enum class Request { None, Calibrate };
+
   struct Status {
     float cmdSyncRateHz;
     float telSyncRateHz;
@@ -25,15 +27,18 @@ public:
   ServoSubsystem();
   void init();
   void loop();
+  void calibrate();
 
   Status status();
   void command(const Command &cmd);
   Telemetry telemetry();
 
 private:
+  void handleRequests();
   void syncCommand();
   void syncTelemetry();
 
+  Protected<Request> _request;
   Protected<Status> _status;
   Protected<Command> _command;
   Protected<Telemetry> _telemetry;

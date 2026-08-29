@@ -21,6 +21,7 @@ private:
   static void _cmdImu(char *arg);
   static void _cmdEnableTelemetry(char *arg);
   static void _cmdPilot(char *arg);
+  static void _cmdServo(char *arg);
 
   static Robot *_robot;
   static Broadcaster* _broadcaster;

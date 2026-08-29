@@ -27,6 +27,8 @@ void ServoSubsystem::init() {
   _servoSerial.begin(kServoBaud, SERIAL_8N1, kServoRxPin, kServoTxPin);
   _bus.pSerial = &_servoSerial;
 
+  _request.write(Request::None);
+
   Status status;
   status.left = _leftHip.init(_bus);
   status.right = _rightHip.init(_bus);
@@ -88,6 +90,25 @@ void ServoSubsystem::syncTelemetry() {
   _lastFeedbackTime = now;
 }
 
+void ServoSubsystem::handleRequests() {
+  Request request = _request.read();
+
+  if (request == Request::None)
+    return;
+
+  switch (request) {
+  case Request::Calibrate:
+    if (_leftHip.calibrate() && _rightHip.calibrate()) {
+      Serial.println("[SERVO] Calibration success!");
+    } else {
+      Serial.println("[SERVO] Calibration failed!");
+    }
+    break;
+  }
+
+  _request.write(Request::None);
+}
+
 void ServoSubsystem::loop() {
   for (;;) {
     auto s = status();
@@ -96,11 +117,14 @@ void ServoSubsystem::loop() {
       continue;
     }
 
+    handleRequests();
     syncCommand();
     syncTelemetry();
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
+
+void ServoSubsystem::calibrate() { _request.write(Request::Calibrate); }
 
 ServoSubsystem::Status ServoSubsystem::status() { return _status.read(); }
 

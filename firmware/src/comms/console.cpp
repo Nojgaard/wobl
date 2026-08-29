@@ -36,6 +36,7 @@ void Console::init() {
   _commander.add('i', _cmdImu, "imu telemetry");
   _commander.add('b', _cmdEnableTelemetry, "enable telemetry [0|1]");
   _commander.add('p', _cmdPilot, "pilot [d|s|f]");
+  _commander.add('r', _cmdServo, "servo [c]");
 
   Serial.println("Console ready. Type '?' for commands.");
 }
@@ -315,5 +316,17 @@ void Console::_cmdPilot(char *arg) {
     _pilot->forgetDevices();
   } else {
     Serial.printf("Unknown: '%s'. Try: d s0 s1 f\n", arg);
+  }
+}
+
+// ===================================================================
+// Command: r — Servo
+// ===================================================================
+
+void Console::_cmdServo(char *arg) {
+  _skipSpace(&arg);
+
+  if (arg[0] == 'c') {
+    _robot->servos.calibrate();
   }
 }

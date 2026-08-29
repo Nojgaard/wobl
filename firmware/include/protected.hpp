@@ -3,8 +3,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-template <typename T>
-class Protected {
+template <typename T> class Protected {
   T _val;
   portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
 
@@ -14,6 +13,7 @@ public:
     _val = v;
     taskEXIT_CRITICAL(&_mux);
   }
+
   T read() {
     taskENTER_CRITICAL(&_mux);
     T tmp = _val;
