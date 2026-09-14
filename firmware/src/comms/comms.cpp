@@ -14,6 +14,7 @@ static void loop(void *param) {
 
     comms->pilot.update();
     comms->broadcaster.update();
+    comms->monitor.update();
 
     vTaskDelay(pdMS_TO_TICKS(5));
   }
@@ -23,6 +24,7 @@ void Comms::init() {
   pilot.init();
   console.init();
   broadcaster.init();
+  monitor.init();
 
   xTaskCreatePinnedToCore(loop, "comms", 4096, this, 5, NULL, 0);
 

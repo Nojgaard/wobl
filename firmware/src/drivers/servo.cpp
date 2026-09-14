@@ -67,7 +67,8 @@ bool Servo::calibrate() {
   if (!data().valid)
     return false;
 
-  return _bus->CalibrationOfs(_config.id) == _config.id;
+  _bus->CalibrationOfs(_config.id);
+  return true;
 }
 
 int Servo::radiansToSteps(float radians) const {

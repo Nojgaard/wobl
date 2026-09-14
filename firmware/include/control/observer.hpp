@@ -16,24 +16,14 @@ public:
 
     float forwardVelocity;
     float turnVelocity;
-  };
 
-  struct Config {
-    float tcRates;
-    float tcVelocities;
+    float leftLegHeight;
+    float rightLegHeight;
   };
 
   State update(const ImuSubsystem::Telemetry &imuTelemetry,
                const WheelSubsystem::Telemetry &wheelTelemetry,
                const ServoSubsystem::Telemetry &servoTelemetry, float dt);
 
-  Config config();
-  void config(const Config &cfg);
-
 private:
-  LowPassFilter _pitchRate{0.0f};
-  LowPassFilter _rollRate{0.0f};
-
-  LowPassFilter _leftWheelVelocity{0.0f};
-  LowPassFilter _rightWheelVelocity{0.0f};
 };

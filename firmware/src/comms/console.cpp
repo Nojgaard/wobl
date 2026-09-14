@@ -1,4 +1,5 @@
 #include "comms/console.hpp"
+#include "comms/monitor.hpp"
 #include <Arduino.h>
 
 static void _skipSpace(char **p) {
@@ -13,21 +14,23 @@ static void _skipSpace(char **p) {
 Robot *Console::_robot = nullptr;
 Broadcaster *Console::_broadcaster = nullptr;
 Pilot *Console::_pilot = nullptr;
+Monitor *Console::_monitor = nullptr;
 Commander Console::_commander(Serial);
 
 // -------------------------------------------------------------------
 // Public API
 // -------------------------------------------------------------------
 
-Console::Console(Robot *robot, Broadcaster *broadcaster, Pilot *pilot) {
+Console::Console(Robot *robot, Broadcaster *broadcaster, Pilot *pilot,
+                 Monitor *monitor) {
   _robot = robot;
   _broadcaster = broadcaster;
   _pilot = pilot;
+  _monitor = monitor;
 }
 
 void Console::init() {
   _commander.add('s', _cmdStatus, "status");
-  _commander.add('o', _cmdObserverConfig, "config observer [r|p][=val]");
   _commander.add('g', _cmdControllerConfig, "config control [p|r|v|x|o][=val]");
   _commander.add('t', _cmdWheelConfig, "config wheel [p|i|d|f][=val]");
   _commander.add('e', _cmdEnable, "enable [0|1]");
@@ -37,6 +40,7 @@ void Console::init() {
   _commander.add('b', _cmdEnableTelemetry, "enable telemetry [0|1]");
   _commander.add('p', _cmdPilot, "pilot [d|s|f]");
   _commander.add('r', _cmdServo, "servo [c]");
+  _commander.add('m', _cmdMonitor, "monitor [s|n]");
 
   Serial.println("Console ready. Type '?' for commands.");
 }
@@ -56,7 +60,7 @@ void Console::_cmdStatus(char *arg) {
   auto ws = r.wheels.status();
   auto ss = r.servos.status();
   auto cs = r.controller.status();
-  auto ps = p.status(); 
+  auto ps = p.status();
 
   Serial.printf("IMU   status=%i sync=%.0fHz\n", is.status, is.syncRateHz);
   Serial.printf("WHEEL status=[L=%i R=%i] sync=%.0fHz update=%.0fHz\n", ws.left,
@@ -271,31 +275,6 @@ void Console::_cmdEnableTelemetry(char *arg) {
   }
 }
 
-void Console::_cmdObserverConfig(char *arg) {
-  _skipSpace(&arg);
-  auto cfg = _robot->controller.observer.config();
-
-  if (*arg == '\0') {
-    Serial.printf("tcRates=%.3f tcVelocities=%.3f\n", cfg.tcRates,
-                  cfg.tcVelocities);
-    return;
-  }
-
-  float v;
-  if (sscanf(arg, "r=%f", &v) == 1) {
-    Serial.printf("tcRates: %.3f -> %.3f\n", cfg.tcRates, v);
-    cfg.tcRates = v;
-  } else if (sscanf(arg, "v=%f", &v) == 1) {
-    Serial.printf("tcVelocities:   %.3f -> %.3f\n", cfg.tcVelocities, v);
-    cfg.tcVelocities = v;
-  } else {
-    Serial.printf("Unknown: '%s'. Try r=val v=val\n", arg);
-    return;
-  }
-
-  _robot->controller.observer.config(cfg);
-}
-
 void Console::_cmdPilot(char *arg) {
   _skipSpace(&arg);
 
@@ -328,5 +307,31 @@ void Console::_cmdServo(char *arg) {
 
   if (arg[0] == 'c') {
     _robot->servos.calibrate();
+  }
+}
+
+// ===================================================================
+// Command: m - Monitor
+// ===================================================================
+
+void Console::_cmdMonitor(char *arg) {
+  _skipSpace(&arg);
+
+  switch (arg[0]) {
+  case 's':
+    _monitor->mode = Monitor::Display::SERVO;
+    Serial.println("Monitoring servo");
+    break;
+  case 'r':
+    _monitor->mode = Monitor::Display::ROBOT;
+    Serial.println("Monitoring robot");
+    break;
+  case 'n':
+    _monitor->mode = Monitor::Display::NONE;
+    Serial.println("Monitoring disabled");
+    break;
+  default:
+    Serial.println("Usage: m [s|n]");
+    break;
   }
 }

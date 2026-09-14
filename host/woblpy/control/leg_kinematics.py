@@ -42,10 +42,13 @@ class LegKinematics:
         )
 
     def _tri_edge_length(self, a, b, theta):
-        return np.sqrt(a**2 + b**2 - 2 * a * b * np.cos(theta))
+        squared_length = a**2 + b**2 - 2 * a * b * np.cos(theta)
+        return np.sqrt(squared_length)
+        # return np.hypot(a - b, 2 * np.sqrt(a * b) * np.sin(theta / 2))
 
     def _tri_angle(self, a, b, c):
-        return np.acos((a**2 + b**2 - c**2) / (2 * a * b))
+        cosine = (a * a + b * b - c * c) / (2 * a * b)
+        return np.arccos(cosine)
 
     def to_height(self, angle):
         theta_a = self._angle_offset - angle
@@ -87,6 +90,13 @@ if __name__ == "__main__":
 
     robot = Robot()
     kin = LegKinematics(robot.leg_keypoints, robot.servo_limits())
+
+    print("AB", kin._ab)
+    print("BC", kin._bc)
+    print("CD", kin._cd)
+    print("AD", kin._ad)
+    print("DE", kin._de)
+    print("angle offset", kin._angle_offset)
 
     print("Angle Range:", kin.angle_range)
     print("Nominal Height:", kin.to_height(0.1))

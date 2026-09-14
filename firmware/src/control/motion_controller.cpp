@@ -75,16 +75,18 @@ MotionController::update(const ImuSubsystem::Telemetry &imuTelemetry,
   float dt = (now - _lastUpdateTimeMs) / 1000.0f;
   _lastUpdateTimeMs = now;
   dt = std::min(dt, 0.05f);
+  
+  auto state = observer.update(imuTelemetry, wheelTelemetry, servoTelemetry, dt);
 
   auto cmd = _command.read();
   ControlOutput output = {};
 
   if (!cmd.enable) {
     _positionError = 0.0f;
+    sync(cmd, state, output, dt);
     return output;
   }
 
-  auto state = observer.update(imuTelemetry, wheelTelemetry, servoTelemetry, dt);
   output.wheels = balance(cmd, state, dt);
 
   output.servos = ServoSubsystem::Command{
