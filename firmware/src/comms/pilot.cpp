@@ -1,4 +1,5 @@
 #include "comms/pilot.hpp"
+#include "control/leg_kinematics.hpp"
 #include <Arduino.h>
 #include <Bluepad32.h>
 
@@ -10,11 +11,24 @@ static constexpr float AXIS_MAX = 520;
 static constexpr float MAX_FWD_VEL = 0.3f; // m/s
 static constexpr float MAX_TURN_VEL = 0.5f;
 
+static constexpr float TRIGGER_DEADZONE = 50;
+static constexpr float TRIGGER_MAX = 1023;
+
+static constexpr float HEIGHT_VEL = 0.01f; // m/s
+static constexpr float MAX_ROLL = 0.2f;    // rad
+
 float normalizeAxis(int32_t value) {
   if (abs(value) < AXIS_DEADZONE) {
     return 0.0f;
   }
   return (float)value / AXIS_MAX;
+}
+
+float normalizeTrigger(int32_t value) {
+  if (value < TRIGGER_DEADZONE) {
+    return 0.0f;
+  }
+  return (float)value / TRIGGER_MAX;
 }
 
 bool hasData() {
@@ -81,7 +95,19 @@ void Pilot::update() {
   float tarTurnVel =
       _tarTurnVel(normalizeAxis(gamepad->axisRX()) * MAX_TURN_VEL);
 
+  int heightDir =
+      static_cast<int>(gamepad->r1()) - static_cast<int>(gamepad->l1());
+  _tarHeight += heightDir * HEIGHT_VEL * dt;
+  _tarHeight = std::clamp(_tarHeight, LegKinematics::HEIGHT_MIN,
+                          LegKinematics::HEIGHT_MAX);
+
+  float roll =
+      (normalizeTrigger(gamepad->l2()) - normalizeTrigger(gamepad->r2())) *
+      MAX_ROLL;
+
   _robot.controller.command({.enable = _enableController,
+                             .roll = roll,
+                             .height = _tarHeight,
                              .forwardVelocity = tarFwdVel,
                              .turnVelocity = tarTurnVel});
 

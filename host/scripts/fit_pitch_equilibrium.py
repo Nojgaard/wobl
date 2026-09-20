@@ -25,7 +25,7 @@ _HEIGHT_RANGE = (0.06, 0.16)  # MotionController._MIN/_MAX_HEIGHT
 def measure_equilibrium(heights: np.ndarray) -> np.ndarray:
     """Return an Nx2 array of (height, theta_eq) rows for the given heights."""
     robot = Robot()
-    leg_ik = LegKinematics(robot.leg_keypoints)
+    leg_ik = LegKinematics(robot.leg_keypoints, robot.servo_limits())
     physics = mjcf.Physics.from_mjcf_model(robot.mjcf_model)
 
     hip_act_l = robot.mjcf_model.find("actuator", "L_hip")

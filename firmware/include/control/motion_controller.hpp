@@ -14,6 +14,12 @@ public:
 
   struct Command {
     bool enable;
+
+    // Pose
+    float roll;
+    float height;
+
+    // Velocity
     float forwardVelocity;
     float turnVelocity;
   };
@@ -59,6 +65,10 @@ public:
 private:
   WheelSubsystem::Command balance(const Command &cmd,
                                   const Observer::State &state, float dt);
+
+  ServoSubsystem::Command pose(const Command &cmd, const Observer::State &state,
+                               float dt);
+
   void sync(const Command &cmd, const Observer::State &state,
             const ControlOutput &controlOutput, float dt);
 
