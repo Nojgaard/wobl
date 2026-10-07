@@ -11,7 +11,7 @@ bool Servo::init(SMS_STS &bus) {
   _bus = &bus;
   if (_bus->Ping(_config.id) == -1)
     return false;
-  _bus->writeByte(_config.id, SMS_STS_MODE, 0); // position control mode	
+  _bus->writeByte(_config.id, SMS_STS_MODE, 0); // position control mode
   _bus->EnableTorque(_config.id, false);
   update();
   return true;
@@ -36,12 +36,13 @@ void Servo::command(const Command &cmd) {
     return;
 
   int velocitySteps = radiansToSteps(_config.maxVelocityRps);
-  velocitySteps = std::clamp(velocitySteps, 0, MAX_SPEED_STEPS);
+  velocitySteps = std::clamp(velocitySteps, 0, MAX_SPEED_STEPS_PER_SECOND);
 
-  int accelerationSteps = radiansToSteps(_config.maxAccelerationRps2);
-  accelerationSteps = std::clamp(accelerationSteps, 0, MAX_ACCELERATION_STEPS);
+  int accelerationUnits = radiansToSteps(_config.maxAccelerationRps2) /
+                          ACCELERATION_UNIT_STEPS_PER_SECOND_SQUARED;
+  accelerationUnits = std::clamp(accelerationUnits, 0, MAX_ACCELERATION_UNITS);
 
-  _bus->WritePosEx(_config.id, positionSteps, velocitySteps, accelerationSteps);
+  _bus->WritePosEx(_config.id, positionSteps, velocitySteps, accelerationUnits);
   _lastWrittenSteps = positionSteps;
 }
 
@@ -55,13 +56,11 @@ void Servo::update() {
       stepsToRadians(_bus->ReadPos(-1) - STEPS_PER_REVOLUTION / 2);
   _data.velocityRps = _config.coordSign * stepsToRadians(_bus->ReadSpeed(-1));
   _data.effortPct = _bus->ReadLoad(-1) * 0.1f;
-  
+
   _voltage = _bus->ReadVoltage(-1) * 0.1f;
 }
 
-float Servo::voltage() const {
-  return _voltage;
-}
+float Servo::voltage() const { return _voltage; }
 
 bool Servo::calibrate() {
   if (!data().valid)

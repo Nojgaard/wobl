@@ -6,21 +6,21 @@ class Servo {
 public:
   struct Config {
     uint8_t id;
-    float maxVelocityRps;
-    float maxAccelerationRps2;
+    float maxVelocityRps; // rad/s
+    float maxAccelerationRps2; // rad/s^2
     float coordSign = 1.0f; // flip sign if servo axis is mechanically mirrored
   };
 
   struct Data {
     bool valid;
-    float positionRad;
-    float velocityRps;
+    float positionRad; // rad
+    float velocityRps; // rad/s
     float effortPct;
   };
 
   struct Command {
     bool enabled;
-    float positionRad;
+    float positionRad; // rad
   };
 
   Servo(Config config);
@@ -36,8 +36,9 @@ private:
   float stepsToRadians(int steps) const;
 
   static constexpr int STEPS_PER_REVOLUTION = 4096;
-  static constexpr int MAX_SPEED_STEPS = 6800;
-  static constexpr int MAX_ACCELERATION_STEPS = 254;
+  static constexpr int MAX_SPEED_STEPS_PER_SECOND = 3400;
+  static constexpr int MAX_ACCELERATION_UNITS = 254;
+  static constexpr int ACCELERATION_UNIT_STEPS_PER_SECOND_SQUARED = 100;
 
   Config _config;
   SMS_STS *_bus;

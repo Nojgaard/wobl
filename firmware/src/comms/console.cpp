@@ -178,7 +178,9 @@ void Console::_cmdEnable(char *arg) {
 
   int enable;
   if (sscanf(arg, "%d", &enable) == 1) {
-    _robot->controller.command({static_cast<bool>(enable), 0.0f, 0.0f});
+    auto cmd = _robot->controller.command();
+    cmd.enable = static_cast<bool>(enable);
+    _robot->controller.command(cmd);
     Serial.printf("Controller %s\n", enable ? "ENABLED" : "DISABLED");
   } else {
     Serial.printf("Expected 0 or 1, got '%s'\n", arg);

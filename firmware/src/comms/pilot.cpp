@@ -14,7 +14,7 @@ static constexpr float MAX_TURN_VEL = 0.5f;
 static constexpr float TRIGGER_DEADZONE = 50;
 static constexpr float TRIGGER_MAX = 1023;
 
-static constexpr float HEIGHT_VEL = 0.01f; // m/s
+static constexpr float HEIGHT_VEL = 0.03f; // m/s
 static constexpr float MAX_ROLL = 0.2f;    // rad
 
 float normalizeAxis(int32_t value) {

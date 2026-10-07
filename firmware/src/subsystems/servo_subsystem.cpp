@@ -4,19 +4,20 @@
 static constexpr int kServoRxPin = 16;
 static constexpr int kServoTxPin = 17;
 static constexpr long kServoBaud = 1000000;
+static constexpr long kCommandPeriodMs = 50;
 static constexpr float kMaxVelocityRps = 1.0f;
-static constexpr float kMaxAccelerationRps2 = 0.2f;
+static constexpr float kMaxAccelerationRps2 = 5.0f;
 
 static constexpr Servo::Config kLeftHipConfig{
     .id = 0,
-    .maxVelocityRps = 1.0f,
-    .maxAccelerationRps2 = 0.2f,
+    .maxVelocityRps = kMaxVelocityRps,
+    .maxAccelerationRps2 = kMaxAccelerationRps2,
     .coordSign = -1.0f,
 };
 static constexpr Servo::Config kRightHipConfig{
     .id = 5,
-    .maxVelocityRps = 1.0f,
-    .maxAccelerationRps2 = 0.2f,
+    .maxVelocityRps = kMaxVelocityRps,
+    .maxAccelerationRps2 = kMaxAccelerationRps2,
     .coordSign = 1.0f,
 };
 
@@ -49,7 +50,7 @@ void ServoSubsystem::init() {
 
 void ServoSubsystem::syncCommand() {
   long now = millis();
-  if (now - _lastCommandTime < 10) {
+  if (now - _lastCommandTime < kCommandPeriodMs) {
     return;
   }
 
