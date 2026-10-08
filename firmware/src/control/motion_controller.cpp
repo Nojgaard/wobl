@@ -8,12 +8,14 @@ void MotionController::init() {
   _positionError = 0.0f;
 
   _config.write(Config{
-      .pitchOffset = 0.07f,
-      .ctrlScale = 1.0f,
-      .pitchKp = -15.248f,
-      .pitchRateKp = -1.354f,
-      .positionKp = -3.333f,
-      .velocityKp = -4.017f,
+      .balanceGains = BalanceGains{
+        .outputScale = 1.0f,
+        .pitch = -15.248f,
+        .pitchRate = -1.354f,
+        .position = -3.333f,
+        .velocity = -4.017f,
+      },
+      .poseGains = PoseGains{.roll = 0.3f, .rollRate = 0.1f},
   });
 
   _command.write(Command{
@@ -54,19 +56,20 @@ WheelSubsystem::Command MotionController::balance(const Command &cmd,
   float pitchError = state.pitch - pitchOffset;
   float pitchRateError = state.pitchRate;
   float velocityError = state.forwardVelocity - cmd.forwardVelocity;
+  auto gains = cfg.balanceGains;
 
   _positionError += velocityError * dt;
   _positionError = std::clamp(_positionError, -0.1f, 0.1f);
 
-  float ctrlFwdVel = -cfg.pitchKp * pitchError;
-  ctrlFwdVel -= cfg.pitchRateKp * pitchRateError;
-  ctrlFwdVel -= cfg.positionKp * _positionError;
-  ctrlFwdVel -= cfg.velocityKp * velocityError;
+  float ctrlFwdVel = -gains.pitch * pitchError;
+  ctrlFwdVel -= gains.pitchRate * pitchRateError;
+  ctrlFwdVel -= gains.position * _positionError;
+  ctrlFwdVel -= gains.velocity * velocityError;
 
   float ctrlTurnVel = cmd.turnVelocity;
 
-  float ctrlLeft = ctrlFwdVel * cfg.ctrlScale + ctrlTurnVel;
-  float ctrlRight = ctrlFwdVel * cfg.ctrlScale - ctrlTurnVel;
+  float ctrlLeft = ctrlFwdVel * gains.outputScale + ctrlTurnVel;
+  float ctrlRight = ctrlFwdVel * gains.outputScale - ctrlTurnVel;
   return WheelSubsystem::Command{
       .left = Wheel::Command{.enabled = true, .velocity = ctrlLeft},
       .right = Wheel::Command{.enabled = true, .velocity = ctrlRight}};
@@ -78,6 +81,8 @@ ServoSubsystem::Command MotionController::pose(const Command &cmd,
   if (!cmd.enable)
     return ServoSubsystem::Command{};
 
+  auto gains = _config.read().poseGains;
+
   // The observed roll is caused by both terrain slope and the left/right
   // leg-height difference. Estimate the terrain contribution as the residual
   // between the observed height difference and that implied by the roll.
@@ -88,10 +93,7 @@ ServoSubsystem::Command MotionController::pose(const Command &cmd,
   // compensate for the estimated terrain.
   float hff = WheelKinematics::WHEEL_BASE * sinf(cmd.roll) - terrain_dh;
 
-  float kp = 0.3;
-  float kd = 0.1;
-
-  float dh = hff + kp * (cmd.roll - state.roll) - kd * state.rollRate;
+  float dh = hff + gains.roll * (cmd.roll - state.roll) - gains.rollRate * state.rollRate;
   dh = 0; // disable for now to just test height adjustment
 
   float lh = cmd.height + 0.5f * dh;

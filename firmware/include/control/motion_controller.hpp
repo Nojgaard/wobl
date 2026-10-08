@@ -37,14 +37,22 @@ public:
     ControlOutput output;
   };
 
-  struct Config {
-    float pitchOffset;
-    float ctrlScale;
+  struct PoseGains {
+    float roll;
+    float rollRate;
+  };
 
-    float pitchKp;
-    float pitchRateKp;
-    float positionKp;
-    float velocityKp;
+  struct BalanceGains {
+    float outputScale;
+    float pitch;
+    float pitchRate;
+    float position;
+    float velocity;
+  };
+
+  struct Config {
+    BalanceGains balanceGains;
+    PoseGains poseGains;
   };
 
   Observer observer;

@@ -79,38 +79,35 @@ void Console::_cmdStatus(char *arg) {
 void Console::_cmdControllerConfig(char *arg) {
   _skipSpace(&arg);
   auto cfg = _robot->controller.config();
+  auto &gains = cfg.balanceGains;
 
   if (*arg == '\0') {
     Serial.printf("pitchKp=%.3f  pitchRateKp=%.3f  "
-                  "velKp=%.3f  posKp=%.3f  offset=%.3f\n",
-                  cfg.pitchKp, cfg.pitchRateKp, cfg.velocityKp, cfg.positionKp,
-                  cfg.pitchOffset);
+                  "velKp=%.3f  posKp=%.3f  ctrlScale=%.3f\n",
+                  gains.pitch, gains.pitchRate, gains.velocity, gains.position,
+                  gains.outputScale);
     return;
   }
 
   float v;
-  bool set = false;
 
   if (sscanf(arg, "p=%f", &v) == 1) {
-    Serial.printf("pitchKp:     %.3f -> %.3f\n", cfg.pitchKp, v);
-    cfg.pitchKp = v;
+    Serial.printf("pitchKp:     %.3f -> %.3f\n", gains.pitch, v);
+    gains.pitch = v;
   } else if (sscanf(arg, "r=%f", &v) == 1) {
-    Serial.printf("pitchRateKp: %.3f -> %.3f\n", cfg.pitchRateKp, v);
-    cfg.pitchRateKp = v;
+    Serial.printf("pitchRateKp: %.3f -> %.3f\n", gains.pitchRate, v);
+    gains.pitchRate = v;
   } else if (sscanf(arg, "v=%f", &v) == 1) {
-    Serial.printf("velKp:       %.3f -> %.3f\n", cfg.velocityKp, v);
-    cfg.velocityKp = v;
+    Serial.printf("velKp:       %.3f -> %.3f\n", gains.velocity, v);
+    gains.velocity = v;
   } else if (sscanf(arg, "x=%f", &v) == 1) {
-    Serial.printf("posKp:       %.3f -> %.3f\n", cfg.positionKp, v);
-    cfg.positionKp = v;
-  } else if (sscanf(arg, "o=%f", &v) == 1) {
-    Serial.printf("offset:      %.3f -> %.3f\n", cfg.pitchOffset, v);
-    cfg.pitchOffset = v;
+    Serial.printf("posKp:       %.3f -> %.3f\n", gains.position, v);
+    gains.position = v;
   } else if (sscanf(arg, "c=%f", &v) == 1) {
-    Serial.printf("ctrlScale:   %.3f -> %.3f\n", cfg.ctrlScale, v);
-    cfg.ctrlScale = v;
+    Serial.printf("ctrlScale:   %.3f -> %.3f\n", gains.outputScale, v);
+    gains.outputScale = v;
   } else {
-    Serial.printf("Unknown: '%s'. Try p=val r=val v=val x=val o=val\n", arg);
+    Serial.printf("Unknown: '%s'. Try p=val r=val v=val x=val c=val\n", arg);
     return;
   }
 
