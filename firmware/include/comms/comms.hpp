@@ -8,7 +8,7 @@ class Comms {
 public:
   Comms(Robot &robot)
       : broadcaster(robot), monitor(robot), pilot(robot),
-        console(&robot, &broadcaster, &pilot, &monitor) {}
+        console(robot, broadcaster, pilot, monitor) {}
   void init();
 
   Broadcaster broadcaster;

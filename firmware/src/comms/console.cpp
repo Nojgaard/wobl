@@ -1,60 +1,166 @@
 #include "comms/console.hpp"
-#include "comms/monitor.hpp"
 #include <Arduino.h>
 
-static void _skipSpace(char **p) {
-  while (**p == ' ' || **p == '\n' || **p == '\r')
-    (*p)++;
+bool parse(const char *args, float &value) {
+  return sscanf(args, "%f", &value) == 1;
 }
 
-// -------------------------------------------------------------------
-// Static member definitions
-// -------------------------------------------------------------------
-
-Robot *Console::_robot = nullptr;
-Broadcaster *Console::_broadcaster = nullptr;
-Pilot *Console::_pilot = nullptr;
-Monitor *Console::_monitor = nullptr;
-Commander Console::_commander(Serial);
-
-// -------------------------------------------------------------------
-// Public API
-// -------------------------------------------------------------------
-
-Console::Console(Robot *robot, Broadcaster *broadcaster, Pilot *pilot,
-                 Monitor *monitor) {
-  _robot = robot;
-  _broadcaster = broadcaster;
-  _pilot = pilot;
-  _monitor = monitor;
+bool parse(const char *args, bool &value) {
+  int ival = 0;
+  bool success = sscanf(args, "%d", &ival) == 1;
+  value = success ? static_cast<bool>(ival) : value;
+  return success;
 }
 
-void Console::init() {
-  _commander.add('s', _cmdStatus, "status");
-  _commander.add('g', _cmdControllerConfig, "config control [p|r|v|x|o][=val]");
-  _commander.add('t', _cmdWheelConfig, "config wheel [p|i|d|f][=val]");
-  _commander.add('e', _cmdEnable, "enable [0|1]");
-  _commander.add('w', _cmdWheel, "drive [vel]");
-  _commander.add('c', _cmdCalibrate, "calibrate [i|w]");
-  _commander.add('i', _cmdImu, "imu telemetry");
-  _commander.add('b', _cmdEnableTelemetry, "enable telemetry [0|1]");
-  _commander.add('p', _cmdPilot, "pilot [d|s|f]");
-  _commander.add('r', _cmdServo, "servo [c]");
-  _commander.add('m', _cmdMonitor, "monitor [s|n]");
-
-  Serial.println("Console ready. Type '?' for commands.");
+void printValue(float value) { Serial.println(value, 2); }
+void printValue(bool value) { Serial.println(value ? "true" : "false"); }
+void printValue(Direction value) {
+  switch (value) {
+  case Direction::CW:
+    Serial.println("CW");
+    break;
+  case Direction::CCW:
+    Serial.println("CCW");
+    break;
+  default:
+    Serial.println("UNKNOWN");
+    break;
+  }
 }
 
-void Console::update() { _commander.run(); }
+template <typename Context> struct CommandEntry {
+  char key;
+  const char *name;
+  void (*callback)(const char *, const char *, Context &);
+  void (*print)(const char *, const Context &) = nullptr;
 
-// ===================================================================
-// Command: s — Status
-// ===================================================================
+  template <auto Context::*Member>
+  static constexpr CommandEntry assign(char key, const char *name) {
+    return {key, name,
+            [](const char *name, const char *args, Context &context) {
+              if (parse(args, context.*Member)) {
+                Serial.printf("%s set to ", name);
+                printValue(context.*Member);
+              } else {
+                Serial.printf("Could not parse %s from '%s'\n", name, args);
+              }
+            },
+            [](const char *name, const Context &context) {
+              Serial.printf("%s: ", name);
+              printValue(context.*Member);
+            }};
+  }
 
-void Console::_cmdStatus(char *arg) {
-  _skipSpace(&arg);
-  auto &r = *_robot;
-  auto &p = *_pilot;
+  // Read-only entry
+  template <auto Context::*Member>
+  static constexpr CommandEntry field(char key, const char *name) {
+    return {key, name, nullptr,
+            [](const char *name, const Context &context) {
+              Serial.printf("%s: ", name);
+              printValue(context.*Member);
+            }};
+  }
+
+  template <void (*handler)(const char *, Context &)>
+  static constexpr CommandEntry route(char key, const char *name) {
+    return {key, name, [](const char *, const char *args, Context &context) {
+              handler(args, context);
+            }};
+  }
+};
+
+struct CommandTable {
+
+  template <typename Context, size_t N>
+  static const CommandEntry<Context> *
+  find(const CommandEntry<Context> (&entries)[N], char key) {
+    for (size_t i = 0; i < N; ++i) {
+      if (entries[i].key == key) {
+        return &entries[i];
+      }
+    }
+    return nullptr;
+  }
+
+  template <typename Context, size_t N>
+  static void print(const CommandEntry<Context> (&entries)[N],
+                    const Context &context) {
+    for (const auto &entry : entries) {
+      if (entry.print) {
+        entry.print(entry.name, context);
+      }
+    }
+  }
+
+  template <typename Context, size_t N>
+  static void dispatch(const CommandEntry<Context> (&entries)[N],
+                       const char *args, Context &context) {
+    const char key = args[0];
+
+    if (key == '\0') {
+      print(entries, context);
+      return;
+    }
+
+    if (key == '?') {
+      Serial.println("Available commands:");
+      for (size_t i = 0; i < N; ++i) {
+        Serial.printf("  %c: %s\n", entries[i].key, entries[i].name);
+      }
+      return;
+    }
+
+    const CommandEntry<Context> *entry = find(entries, key);
+    if (entry) {
+      if (entry->callback) {
+        entry->callback(entry->name, args + 1, context);
+      } else if (entry->print) {
+        entry->print(entry->name, context);
+      }
+      return;
+    }
+
+    Serial.printf("Unknown command: %c\n", key);
+  }
+};
+
+Console::Console(Robot &robot, Broadcaster &broadcaster, Pilot &pilot,
+                 Monitor &monitor)
+    : robot(robot), broadcaster(broadcaster), pilot(pilot), monitor(monitor) {}
+
+void Console::init() {}
+
+void Console::update() {
+  while (Serial.available()) {
+    const char c = Serial.read();
+    if (c == ' ' || c == '\r' || c == '\t')
+      continue;
+
+    _received_chars[_received_count++] = c;
+
+    if (c == '\n') {
+      _received_chars[_received_count - 1] = '\0';
+      dispatch(_received_chars);
+
+      memset(_received_chars, 0, MAX_CMD_SIZE);
+      _received_count = 0;
+    }
+
+    if (_received_count >= MAX_CMD_SIZE) {
+      Serial.println("Error: input line too long");
+      memset(_received_chars, 0, MAX_CMD_SIZE);
+      _received_count = 0;
+    }
+  }
+}
+
+/*
+ * Status Commands
+ */
+
+void cmdStatus(const char *, Console &console) {
+  Robot &r = console.robot;
+  Pilot &p = console.pilot;
 
   auto is = r.imu.status();
   auto ws = r.wheels.status();
@@ -72,265 +178,223 @@ void Console::_cmdStatus(char *arg) {
   Serial.printf("BATT  volt=%.2fV\n", ss.voltage);
 }
 
-// ===================================================================
-// Command: g — ControllerConfig
-// ===================================================================
+/* Controller Commands */
 
-void Console::_cmdControllerConfig(char *arg) {
-  _skipSpace(&arg);
-  auto cfg = _robot->controller.config();
-  auto &gains = cfg.balanceGains;
+void cmdControllerPoseGains(const char *args, MotionController &controller) {
+  using Gains = MotionController::PoseGains;
+  using Entry = CommandEntry<Gains>;
 
-  if (*arg == '\0') {
-    Serial.printf("pitchKp=%.3f  pitchRateKp=%.3f  "
-                  "velKp=%.3f  posKp=%.3f  ctrlScale=%.3f\n",
-                  gains.pitch, gains.pitchRate, gains.velocity, gains.position,
-                  gains.outputScale);
-    return;
-  }
+  static constexpr Entry commands[] = {
+      Entry::assign<&Gains::roll>('p', "roll"),
+      Entry::assign<&Gains::rollRate>('d', "rollRate"),
+  };
 
-  float v;
+  auto cfg = controller.config();
+  CommandTable::dispatch(commands, args, cfg.poseGains);
+  controller.config(cfg);
+}
 
-  if (sscanf(arg, "p=%f", &v) == 1) {
-    Serial.printf("pitchKp:     %.3f -> %.3f\n", gains.pitch, v);
-    gains.pitch = v;
-  } else if (sscanf(arg, "r=%f", &v) == 1) {
-    Serial.printf("pitchRateKp: %.3f -> %.3f\n", gains.pitchRate, v);
-    gains.pitchRate = v;
-  } else if (sscanf(arg, "v=%f", &v) == 1) {
-    Serial.printf("velKp:       %.3f -> %.3f\n", gains.velocity, v);
-    gains.velocity = v;
-  } else if (sscanf(arg, "x=%f", &v) == 1) {
-    Serial.printf("posKp:       %.3f -> %.3f\n", gains.position, v);
-    gains.position = v;
-  } else if (sscanf(arg, "c=%f", &v) == 1) {
-    Serial.printf("ctrlScale:   %.3f -> %.3f\n", gains.outputScale, v);
-    gains.outputScale = v;
+void cmdControllerBalanceGains(const char *args, MotionController &controller) {
+  using Gains = MotionController::BalanceGains;
+  using Entry = CommandEntry<Gains>;
+
+  static constexpr Entry commands[] = {
+      Entry::assign<&Gains::pitch>('p', "pitch"),
+      Entry::assign<&Gains::pitchRate>('r', "pitchRate"),
+      Entry::assign<&Gains::velocity>('v', "velocity"),
+      Entry::assign<&Gains::position>('x', "position"),
+  };
+
+  auto cfg = controller.config();
+  CommandTable::dispatch(commands, args, cfg.balanceGains);
+  controller.config(cfg);
+}
+
+void cmdControllerCommand(const char *args, MotionController &controller) {
+  using Command = MotionController::Command;
+  using Entry = CommandEntry<Command>;
+
+  static constexpr Entry commands[] = {
+      Entry::assign<&Command::enable>('e', "enable"),
+  };
+
+  auto cmd = controller.command();
+  CommandTable::dispatch(commands, args, cmd);
+  controller.command(cmd);
+}
+
+void cmdController(const char *args, Console &console) {
+  using Entry = CommandEntry<MotionController>;
+
+  static constexpr CommandEntry<MotionController> commands[] = {
+      Entry::route<cmdControllerCommand>('c', "controller command"),
+      Entry::route<cmdControllerBalanceGains>('b', "balance gains"),
+      Entry::route<cmdControllerPoseGains>('p', "pose gains"),
+  };
+
+  CommandTable::dispatch(commands, args, console.robot.controller);
+};
+
+/*
+ * Servo Commands
+ */
+
+void cmdServo(const char *args, Console &console) {
+  auto calibrate = [](const char *, ServoSubsystem &servos) {
+    servos.calibrate();
+  };
+
+  using Entry = CommandEntry<ServoSubsystem>;
+  static constexpr CommandEntry<ServoSubsystem> commands[] = {
+      Entry::route<calibrate>('c', "calibrate")};
+
+  CommandTable::dispatch(commands, args, console.robot.servos);
+}
+
+/*
+ * Wheel Commands
+ */
+
+void cmdWheelTune(const char *args, WheelSubsystem &wheels) {
+  using Tuning = Wheel::VelocityTuning;
+  using Entry = CommandEntry<Tuning>;
+
+  static constexpr CommandEntry<Tuning> commands[] = {
+      Entry::assign<&Tuning::lpf_velocity_tf>('f', "lpf_vel"),
+  };
+
+  auto t = wheels.tuning(Wheel::Id::Left);
+  CommandTable::dispatch(commands, args, t);
+  wheels.tune(t, false);
+}
+
+void cmdWheelCalibrate(const char *args, WheelSubsystem &wheels) {
+  auto calibrate = [](const char *, WheelSubsystem &wheels) {
+    wheels.calibrate();
+  };
+
+  using F = CommandEntry<Wheel::Calibration>;
+  static constexpr F fields[] = {
+      F::field<&Wheel::Calibration::zero_electric_angle>('a', "zero angle"),
+      F::field<&Wheel::Calibration::sensor_direction>('d', "direction"),
+  };
+
+  using Entry = CommandEntry<WheelSubsystem>;
+  static constexpr Entry commands[] = {Entry::route<calibrate>('r', "run")};
+
+  if (args[0] == '\0') {
+    Serial.println("Left:");
+    auto cl = wheels.calibration(Wheel::Id::Left);
+    CommandTable::print(fields, cl);
+
+    Serial.println("Right:");
+    auto cr = wheels.calibration(Wheel::Id::Right);
+    CommandTable::print(fields, cr);
   } else {
-    Serial.printf("Unknown: '%s'. Try p=val r=val v=val x=val c=val\n", arg);
-    return;
-  }
-
-  _robot->controller.config(cfg);
-}
-
-// ===================================================================
-// Command: t — WheelConfig
-// ===================================================================
-
-void Console::_cmdWheelConfig(char *arg) {
-  _skipSpace(&arg);
-
-  // No arg → print both wheels
-  if (*arg == '\0') {
-    auto tL = _robot->wheels.tuning(Wheel::Id::Left);
-    auto tR = _robot->wheels.tuning(Wheel::Id::Right);
-    Serial.printf("Left:  p=%.4f  i=%.4f  d=%.4f  f=%.4f\n", tL.p, tL.i, tL.d,
-                  tL.lpf_velocity_tf);
-    Serial.printf("Right: p=%.4f  i=%.4f  d=%.4f  f=%.4f\n", tR.p, tR.i, tR.d,
-                  tR.lpf_velocity_tf);
-    return;
-  }
-
-  // Param
-  auto t = _robot->wheels.tuning(Wheel::Id::Left);
-  float v;
-  bool persist = false;
-
-  if (sscanf(arg, "p=%f", &v) == 1) {
-    Serial.printf("P: %.4f -> %.4f\n", t.p, v);
-    t.p = v;
-  } else if (sscanf(arg, "i=%f", &v) == 1) {
-    Serial.printf("I: %.4f -> %.4f\n", t.i, v);
-    t.i = v;
-  } else if (sscanf(arg, "d=%f", &v) == 1) {
-    Serial.printf("D: %.4f -> %.4f\n", t.d, v);
-    t.d = v;
-  } else if (sscanf(arg, "f=%f", &v) == 1) {
-    Serial.printf("LPF: %.4f -> %.4f\n", t.lpf_velocity_tf, v);
-    t.lpf_velocity_tf = v;
-  } else if (arg[0] == 's') {
-    persist = true;
-    Serial.println("Persisting tuning to NVS");
-  } else {
-    Serial.printf("Unknown: '%s'. Try p=val i=val d=val f=val\n", arg);
-    return;
-  }
-
-  _robot->wheels.tune(t, persist);
-}
-
-// ===================================================================
-// Command: e — Enable
-// ===================================================================
-
-void Console::_cmdEnable(char *arg) {
-  _skipSpace(&arg);
-
-  if (*arg == '\0') {
-    auto cmd = _robot->controller.command();
-    Serial.printf("Controller %s\n", cmd.enable ? "ENABLED" : "DISABLED");
-    return;
-  }
-
-  int enable;
-  if (sscanf(arg, "%d", &enable) == 1) {
-    auto cmd = _robot->controller.command();
-    cmd.enable = static_cast<bool>(enable);
-    _robot->controller.command(cmd);
-    Serial.printf("Controller %s\n", enable ? "ENABLED" : "DISABLED");
-  } else {
-    Serial.printf("Expected 0 or 1, got '%s'\n", arg);
+    CommandTable::dispatch(commands, args, wheels);
   }
 }
 
-// ===================================================================
-// Command: w — Wheel passthrough
-// ===================================================================
+void cmdWheel(const char *args, Console &console) {
+  using Entry = CommandEntry<WheelSubsystem>;
 
-void Console::_cmdWheel(char *arg) {
-  _skipSpace(&arg);
+  static constexpr CommandEntry<WheelSubsystem> commands[] = {
+      Entry::route<cmdWheelTune>('t', "tune"),
+      Entry::route<cmdWheelCalibrate>('c', "calibrate")};
 
-  // Safety: passthrough only when controller is off
-  if (_robot->controller.command().enable) {
-    Serial.println(
-        "Controller enabled - refusing passthrough. Disable with 'e0' first.");
-    return;
-  }
-
-  if (*arg == '\0') {
-    auto tel = _robot->wheels.telemetry();
-    Serial.printf("Left:  %.2f rad/s\n", tel.left.velocity);
-    Serial.printf("Right: %.2f rad/s\n", tel.right.velocity);
-    return;
-  }
-
-  float vel;
-  WheelSubsystem::Command cmd{};
-
-  if (sscanf(arg, "%f", &vel) == 1) {
-    cmd.left = {true, vel};
-    cmd.right = {true, vel};
-    _robot->wheels.command(cmd);
-    Serial.printf("Drive: %.2f rad/s\n", vel);
-  } else {
-    Serial.printf("Unknown: '%s'. Try '5.0' or '3.0'\n", arg);
-  }
+  CommandTable::dispatch(commands, args, console.robot.wheels);
 }
 
-// ===================================================================
-// Command: c — Calibrate
-// ===================================================================
+/*
+ * Pilot Commands
+ */
 
-void Console::_cmdCalibrate(char *arg) {
-  _skipSpace(&arg);
+void cmdPilot(const char *args, Console &console) {
+  using Entry = CommandEntry<Pilot>;
 
-  if (*arg == '\0') {
-    auto imuCal = _robot->imu.calibration();
-    auto wCalL = _robot->wheels.calibration(Wheel::Id::Left);
-    auto wCalR = _robot->wheels.calibration(Wheel::Id::Right);
-    Serial.printf(
-        "IMU   gyro=(%ld,%ld,%ld) accel=(%ld,%ld,%ld) mag=(%ld,%ld,%ld)\n",
-        (long)imuCal.gyro[0], (long)imuCal.gyro[1], (long)imuCal.gyro[2],
-        (long)imuCal.accel[0], (long)imuCal.accel[1], (long)imuCal.accel[2],
-        (long)imuCal.mag[0], (long)imuCal.mag[1], (long)imuCal.mag[2]);
-    Serial.printf("WHEEL L angle=%.3f dir=%d  R angle=%.3f dir=%d\n",
-                  wCalL.zero_electric_angle, (int)wCalL.sensor_direction,
-                  wCalR.zero_electric_angle, (int)wCalR.sensor_direction);
-    return;
-  }
+  static constexpr Entry commands[] = {
+      {'d', "disconnect",
+       [](auto, auto, auto &pilot) {
+         Serial.println("Disconnecting gamepad...");
+         pilot.disconnect();
+       }},
+      {'s', "scan [0|1]",
+       [](auto, auto args, auto &pilot) {
+         const bool enable = args[0] == '1';
+         pilot.scanForDevices(enable);
+         Serial.printf("Scan %s\n", enable ? "ENABLED" : "DISABLED");
+       }},
+      {'f', "forget",
+       [](auto, auto, auto &pilot) {
+         Serial.println("Forgetting paired devices...");
+         pilot.forgetDevices();
+       }},
+  };
 
-  if (strcmp(arg, "i") == 0) {
-    Serial.println("Calibrating IMU...");
-    _robot->imu.calibrate();
-    Serial.println("IMU calibration done.");
-  } else if (strcmp(arg, "w") == 0) {
-    Serial.println("Calibrating wheels...");
-    _robot->wheels.calibrate();
-    Serial.println("Wheel calibration done.");
-  } else {
-    Serial.printf("Unknown: '%s'. Try: i w\n", arg);
-  }
+  CommandTable::dispatch(commands, args, console.pilot);
 }
 
-// ===================================================================
-// Command: i — Imu
-// ===================================================================
+/*
+ * Broadcast Commands
+ */
 
-void Console::_cmdImu(char *arg) {
-  auto imu = _robot->imu.telemetry();
-  Serial.printf("r=%.3f p=%.3f y=%.3f\n", imu.roll, imu.pitch, imu.yaw);
+void cmdBroadcast(const char *args, Console &console) {
+  using Entry = CommandEntry<Broadcaster>;
+
+  static constexpr Entry commands[] = {
+      {'e', "enable [0|1]",
+       [](auto, auto args, auto &broadcaster) {
+         const bool enable = args[0] == '1';
+         broadcaster.enable(enable);
+         Serial.printf("Broadcast %s\n", enable ? "ENABLED" : "DISABLED");
+       }},
+  };
+
+  CommandTable::dispatch(commands, args, console.broadcaster);
 }
 
-void Console::_cmdEnableTelemetry(char *arg) {
-  _skipSpace(&arg);
+/*
+ * Monitor Commands
+ */
+void cmdMonitor(const char *args, Console &console) {
+  using Entry = CommandEntry<Monitor>;
 
-  int enable;
-  if (sscanf(arg, "%d", &enable) == 1) {
-    _broadcaster->enable(static_cast<bool>(enable));
-    Serial.printf("Telemetry %s\n", enable ? "ENABLED" : "DISABLED");
-  } else {
-    Serial.printf("Expected 0 or 1, got '%s'\n", arg);
-  }
+  static constexpr Entry commands[] = {
+      {'s', "servo",
+       [](const char *name, const char *, Monitor &monitor) {
+         monitor.mode = Monitor::Display::SERVO;
+         Serial.printf("Monitoring %s\n", name);
+       }},
+      {'r', "robot",
+       [](const char *name, const char *, Monitor &monitor) {
+         monitor.mode = Monitor::Display::ROBOT;
+         Serial.printf("Monitoring %s\n", name);
+       }},
+      {'n', "disabled",
+       [](const char *name, const char *, Monitor &monitor) {
+         monitor.mode = Monitor::Display::NONE;
+         Serial.printf("Monitoring %s\n", name);
+       }},
+  };
+
+  CommandTable::dispatch(commands, args, console.monitor);
 }
 
-void Console::_cmdPilot(char *arg) {
-  _skipSpace(&arg);
+/*
+ * Console command dispatcher
+ */
+void Console::dispatch(const char *args) {
+  using Entry = CommandEntry<Console>;
 
-  if (*arg == '\0') {
-    Serial.println("Usage: pilot d=disconnect, s[0|1]=scan, f=forget");
-    return;
-  }
+  static constexpr CommandEntry<Console> commands[] = {
+      Entry::route<cmdStatus>('s', "status"),
+      Entry::route<cmdController>('c', "controller"),
+      Entry::route<cmdServo>('r', "servo"),
+      Entry::route<cmdWheel>('w', "wheel"),
+      Entry::route<cmdPilot>('p', "pilot"),
+      Entry::route<cmdBroadcast>('b', "broadcast"),
+      Entry::route<cmdMonitor>('m', "monitor"),
+  };
 
-  int value;
-  if (strcmp(arg, "d\n") == 0) {
-    Serial.println("Disconnecting gamepad...");
-    _pilot->disconnect();
-  } else if (sscanf(arg, "s%d", &value) == 1) {
-    _pilot->scanForDevices(value != 0);
-    Serial.printf("Scan %s\n", value ? "ENABLED" : "DISABLED");
-  } else if (strcmp(arg, "f\n") == 0) {
-    Serial.println("Forgetting paired devices...");
-    _pilot->forgetDevices();
-  } else {
-    Serial.printf("Unknown: '%s'. Try: d s0 s1 f\n", arg);
-  }
-}
-
-// ===================================================================
-// Command: r — Servo
-// ===================================================================
-
-void Console::_cmdServo(char *arg) {
-  _skipSpace(&arg);
-
-  if (arg[0] == 'c') {
-    _robot->servos.calibrate();
-  }
-}
-
-// ===================================================================
-// Command: m - Monitor
-// ===================================================================
-
-void Console::_cmdMonitor(char *arg) {
-  _skipSpace(&arg);
-
-  switch (arg[0]) {
-  case 's':
-    _monitor->mode = Monitor::Display::SERVO;
-    Serial.println("Monitoring servo");
-    break;
-  case 'r':
-    _monitor->mode = Monitor::Display::ROBOT;
-    Serial.println("Monitoring robot");
-    break;
-  case 'n':
-    _monitor->mode = Monitor::Display::NONE;
-    Serial.println("Monitoring disabled");
-    break;
-  default:
-    Serial.println("Usage: m [s|n]");
-    break;
-  }
+  CommandTable::dispatch(commands, args, *this);
 }

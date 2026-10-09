@@ -1,33 +1,29 @@
 #pragma once
-#include "robot.hpp"
+
 #include "comms/broadcaster.hpp"
 #include "comms/monitor.hpp"
 #include "comms/pilot.hpp"
-#include <SimpleFOC.h>
+#include "robot.hpp"
 
 class Console {
 public:
-  Console(Robot *robot, Broadcaster *broadcaster, Pilot *pilot,
-          Monitor *monitor);
+  Console(Robot &robot, Broadcaster &broadcaster, Pilot &pilot,
+          Monitor &monitor);
+
   void init();
   void update();
 
-private:
-  static void _cmdStatus(char *arg);
-  static void _cmdControllerConfig(char *arg);
-  static void _cmdWheelConfig(char *arg);
-  static void _cmdEnable(char *arg);
-  static void _cmdWheel(char *arg);
-  static void _cmdCalibrate(char *arg);
-  static void _cmdImu(char *arg);
-  static void _cmdEnableTelemetry(char *arg);
-  static void _cmdPilot(char *arg);
-  static void _cmdServo(char *arg);
-  static void _cmdMonitor(char *arg);
+  Robot &robot;
+  Broadcaster &broadcaster;
+  Pilot &pilot;
+  Monitor &monitor;
 
-  static Robot *_robot;
-  static Broadcaster *_broadcaster;
-  static Pilot *_pilot;
-  static Monitor *_monitor;
-  static Commander _commander;
+private:
+  void dispatch(const char *args);
+
+  constexpr static int MAX_CMD_SIZE = 20;
+  // Received serial message - waiting for newline
+  char _received_chars[MAX_CMD_SIZE] = {0};
+  // Number of characters received from serial
+  int _received_count = 0;
 };
