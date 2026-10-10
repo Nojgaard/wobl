@@ -2,8 +2,9 @@
 
 namespace PitchOffset {
 
-constexpr float HEIGHT_TO_PITCH_COEFFS[4] = {-180.146716, 69.166527, -9.579059,
-                                             0.535259};
+// fitted from data/pitch_offset_1.rdd
+constexpr float HEIGHT_TO_PITCH_COEFFS[4] = {-193.81821387, 75.18364797,
+                                             -10.34721967, 0.52621788};
 
 float fromHeight(float height) {
   float pitch = 0.0f;

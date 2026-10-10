@@ -120,7 +120,9 @@ void Broadcaster::update() {
   if (!establishedConnection) {
     Serial.printf("[broadcaster] Connected to '%s'  IP: %s\n", ssid,
                   WiFi.localIP().toString().c_str());
-    broadcastIP = WiFi.broadcastIP();
+    //broadcastIP = WiFi.broadcastIP();
+    broadcastIP = IPAddress(10, 0, 0, 6);
+    Serial.printf("[broadcaster] broadcast=%s\n", broadcastIP.toString().c_str());
     establishedConnection = true;
   }
 

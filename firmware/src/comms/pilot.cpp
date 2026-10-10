@@ -105,6 +105,16 @@ void Pilot::update() {
   int heightDir =
       static_cast<int>(gamepad->r1()) - static_cast<int>(gamepad->l1());
   _tarHeight += heightDir * HEIGHT_VEL * dt;
+
+  if ((_pressedDpad & DPAD_UP) && !(gamepad->dpad() & DPAD_UP)) {
+    _tarHeight += 0.005f;
+  }
+
+  if ((_pressedDpad & DPAD_DOWN) && !(gamepad->dpad() & DPAD_DOWN)) {
+    _tarHeight -= 0.005f;
+  }
+  _pressedDpad = gamepad->dpad();
+
   _tarHeight = std::clamp(_tarHeight, LegKinematics::HEIGHT_MIN,
                           LegKinematics::HEIGHT_MAX);
 

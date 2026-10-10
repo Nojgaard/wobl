@@ -50,7 +50,7 @@
             <geom mesh="back" mass="0.02" />
             <geom mesh="mounting_plate" mass="0.065" />
             <geom mesh="rocker_switch" mass="0.06" />
-            <!--<geom mesh="shell" mass="0.122" />-->
+            <geom mesh="shell" mass="0.122" />
             <geom mesh="battery" mass="0.22" />
             <geom type="box" size="0.028 0.042 0.005" pos="0 -0.0265 0.04579" mass="0.08" />
 

@@ -2,9 +2,12 @@
 
 Usage::
 
-    python scripts/monitor.py                           # live Rerun viewer
-    python scripts/monitor.py --save data/run.rrd       # live + record to file
-    python scripts/monitor.py --save data/run.rrd --no-live  # headless record
+    python scripts/monitor.py                              # receive only
+    python scripts/monitor.py --live                       # live Rerun viewer
+    python scripts/monitor.py --save data/run.rrd          # record to file
+    python scripts/monitor.py --live --save data/run.rrd   # both
+
+While recording, press Enter to drop a checkpoint into the .rrd.
 
 The firmware must have telemetry broadcasting enabled (console command ``b 1``).
 """
@@ -15,6 +18,8 @@ import argparse
 import socket
 import struct
 from pathlib import Path
+
+import pynput.keyboard
 
 from woblpy.record import Recorder
 
@@ -49,6 +54,35 @@ _ENTITIES: list[tuple[str, str, tuple[int, int, int]]] = [
 _paths = [e[0] for e in _ENTITIES]
 
 
+class EnterKeyTrigger:
+    """Non-blocking "Enter was pressed" trigger."""
+
+    def __init__(self) -> None:
+        self._pressed = False
+        self._listener: pynput.keyboard.Listener | None = None
+
+    @property
+    def active(self) -> bool:
+        return self._listener is not None
+
+    def start(self) -> None:
+        self._listener = pynput.keyboard.Listener(on_press=self._on_press)
+        self._listener.start()
+
+    def stop(self) -> None:
+        if self._listener is not None:
+            self._listener.stop()
+            self._listener = None
+
+    def wasPressed(self) -> bool:
+        pressed, self._pressed = self._pressed, False
+        return pressed
+
+    def _on_press(self, key: object) -> None:
+        if key == pynput.keyboard.Key.enter:
+            self._pressed = True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="WOBL UDP telemetry monitor")
     parser.add_argument(
@@ -65,11 +99,14 @@ def main() -> None:
     args = parser.parse_args()
 
     live = args.live
+    enterTrigger = EnterKeyTrigger()
+
     recorder: Recorder | None = None
     if live or args.save is not None:
         recorder = Recorder("wobl-monitor", live=live, save_path=args.save)
         for path, name, colour in _ENTITIES:
             recorder.configure_series(path, name=name, color=colour)
+        enterTrigger.start()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -100,6 +137,10 @@ def main() -> None:
             if recorder is not None:
                 recorder.log_many(fields, t_s=t_s)
 
+                if enterTrigger.wasPressed():
+                    recorder.log_checkpoint(t_s)
+                    print(f"\n  checkpoint @ t={t_s:.2f}s")
+
             pitch = fields["observer/pitch"]
             fwd = fields["observer/forward_velocity"]
             yaw = fields["observer/turn_velocity"]
@@ -112,6 +153,7 @@ def main() -> None:
         print()
     finally:
         sock.close()
+        enterTrigger.stop()
         if recorder is not None:
             recorder.close()
 

@@ -33,6 +33,7 @@ private:
 
   bool _pressedStart = false;
   bool _pressedSelect = false;
+  int8_t _pressedDpad = 0;
 
   Robot &_robot;
   Broadcaster &_broadcaster;

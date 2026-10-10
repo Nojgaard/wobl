@@ -19,6 +19,15 @@ Reading
     gyro = df[["imu/gyro/x", "imu/gyro/y", "imu/gyro/z"]].dropna()
     accel = df[["imu/attitude/pitch", "imu/attitude/roll"]].dropna()
 
+Checkpoints
+-----------
+    rec.log_checkpoint(3.2)                        # mark a timestamp
+
+    from woblpy.record import load_checkpoints, load_recording
+
+    checkpoints = load_checkpoints("data/run.rrd")    # list[float], seconds
+    df, checkpoints = load_recording("data/run.rrd")  # both at once
+
 Notes
 -----
 - ``live=True`` spawns the Rerun viewer as a separate OS process (``rr.spawn``).
@@ -31,9 +40,12 @@ Notes
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from woblpy.control.motion_controller import MotionController
+
+# Entity holding the checkpoint markers.
+_CHECKPOINT_ENTITY = "checkpoints/marker"
 
 
 class Recorder:
@@ -153,6 +165,13 @@ class Recorder:
             return
         self._rr.log(entity, self._rr.TextLog(text))
 
+    def log_checkpoint(self, t_s: float) -> None:
+        """Mark t_s (seconds) as a checkpoint."""
+        if self._rr is None:
+            return
+        self._rr.set_time("t_s", duration=t_s)
+        self._rr.log(_CHECKPOINT_ENTITY, self._rr.Scalars(1.0))
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
@@ -166,7 +185,7 @@ class Recorder:
             self._save_path = None  # prevent double-save
             print("  Recording closed.")
 
-    def __enter__(self) -> Recorder:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -211,7 +230,9 @@ def load_as_dataframe(path: str | Path, *, timeline: str = "t_s") -> Any:
 
     rec = rrec.load_recording(str(path))
 
-    series: dict[str, Any] = {}
+    # An entity is split over several chunks; concatenate them and drop the
+    # handful of timestamps that land in two chunks.
+    parts: dict[str, list[Any]] = {}
     for chunk in rec.chunks():
         if chunk.is_static:
             continue
@@ -226,12 +247,40 @@ def load_as_dataframe(path: str | Path, *, timeline: str = "t_s") -> Any:
         s_values = [v.as_py()[0] for v in rb.column("Scalars:scalars")]
 
         name = chunk.entity_path.lstrip("/")
-        series[name] = pd.Series(s_values, index=t_values, name=name)
+        parts.setdefault(name, []).append(
+            pd.Series(s_values, index=t_values, name=name)
+        )
 
-    if not series:
+    if not parts:
         return pd.DataFrame()
 
-    df = pd.concat(series.values(), axis=1)
+    columns = []
+    for chunks in parts.values():
+        series = pd.concat(chunks).sort_index()
+        columns.append(series[~series.index.duplicated(keep="first")])
+
+    df = pd.concat(columns, axis=1)
     df.index.name = timeline
     df.sort_index(inplace=True)
     return df
+
+
+def load_checkpoints(path: str | Path) -> list[float]:
+    """Return the checkpoint timestamps (seconds), sorted ascending."""
+    import rerun.recording as rrec  # type: ignore
+
+    times: list[float] = []
+    for chunk in rrec.load_recording(str(path)).chunks():
+        if chunk.is_static or chunk.entity_path.lstrip("/") != _CHECKPOINT_ENTITY:
+            continue
+        rb = chunk.to_record_batch()
+        if "t_s" in rb.schema.names:
+            times.extend(v.as_py().total_seconds() for v in rb.column("t_s"))
+    return sorted(times)
+
+
+def load_recording(
+    path: str | Path, *, timeline: str = "t_s"
+) -> tuple[Any, list[float]]:
+    """Load a recording as ``(dataframe, checkpoint timestamps)``."""
+    return load_as_dataframe(path, timeline=timeline), load_checkpoints(path)

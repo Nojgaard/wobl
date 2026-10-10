@@ -59,7 +59,7 @@ WheelSubsystem::Command MotionController::balance(const Command &cmd,
   auto gains = cfg.balanceGains;
 
   _positionError += velocityError * dt;
-  _positionError = std::clamp(_positionError, -0.1f, 0.1f);
+  _positionError = std::clamp(_positionError, -0.2f, 0.2f);
 
   float ctrlFwdVel = -gains.pitch * pitchError;
   ctrlFwdVel -= gains.pitchRate * pitchRateError;
