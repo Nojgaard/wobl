@@ -18,23 +18,32 @@ from pathlib import Path
 
 from woblpy.record import Recorder
 
-_FMT = struct.Struct("<I12f")
+_FMT = struct.Struct("<I?16f")
 _FMT_SIZE = _FMT.size
 
-# Each entry: (entity_path, display_name, colour)
+# Each entry: (entity_path, display_name, colour).  Order must match the
+# field order of BroadcastTelemetry in firmware/src/comms/broadcaster.cpp.
 _ENTITIES: list[tuple[str, str, tuple[int, int, int]]] = [
-    ("imu/pitch", "Pitch", (255, 160, 0)),
-    ("imu/pitch_rate", "Pitch Rate", (255, 80, 80)),
-    ("imu/roll", "Roll", (0, 200, 255)),
-    ("imu/roll_rate", "Roll Rate", (80, 160, 255)),
-    ("wheel/left_velocity", "Left Wheel Vel", (80, 80, 255)),
-    ("wheel/right_velocity", "Right Wheel Vel", (255, 200, 0)),
-    ("body/forward_velocity", "Body Fwd Vel", (80, 255, 80)),
-    ("body/yaw_rate", "Body Yaw Rate", (255, 255, 80)),
-    ("target/forward_velocity", "Target Fwd Vel", (160, 255, 160)),
-    ("target/yaw_rate", "Target Yaw Rate", (255, 255, 160)),
+    # Input Commands
+    ("command/enable", "Cmd Enable", (200, 200, 200)),
+    ("command/roll", "Cmd Roll", (255, 140, 200)),
+    ("command/height", "Cmd Height", (255, 200, 140)),
+    ("command/forward_velocity", "Cmd Fwd Vel", (160, 255, 160)),
+    ("command/turn_velocity", "Cmd Turn Vel", (255, 255, 160)),
+    # Observed State
+    ("observer/pitch", "Pitch", (255, 160, 0)),
+    ("observer/pitch_rate", "Pitch Rate", (255, 80, 80)),
+    ("observer/roll", "Roll", (0, 200, 255)),
+    ("observer/roll_rate", "Roll Rate", (80, 160, 255)),
+    ("observer/forward_velocity", "Fwd Vel", (80, 255, 80)),
+    ("observer/turn_velocity", "Turn Vel", (255, 255, 80)),
+    ("observer/left_leg_height", "Left Leg Height", (180, 120, 255)),
+    ("observer/right_leg_height", "Right Leg Height", (120, 180, 255)),
+    # Control Output
     ("output/wheel/left", "Cmd Wheel Left", (255, 80, 255)),
     ("output/wheel/right", "Cmd Wheel Right", (200, 80, 200)),
+    ("output/servo/left", "Cmd Servo Left", (80, 255, 255)),
+    ("output/servo/right", "Cmd Servo Right", (80, 200, 200)),
 ]
 
 _paths = [e[0] for e in _ENTITIES]
@@ -75,7 +84,7 @@ def main() -> None:
     try:
         while True:
             try:
-                data, addr = sock.recvfrom(4096)
+                data, _ = sock.recvfrom(4096)
             except TimeoutError:
                 print("\rWaiting for telemetry broadcast...", end="", flush=True)
                 continue
@@ -83,15 +92,17 @@ def main() -> None:
                 continue
 
             ts_ms, *values = _FMT.unpack(data[:_FMT_SIZE])
+            # cmd_enable arrives as a bool -> 0.0 / 1.0 for plotting
+            values[0] = float(values[0])
             t_s = ts_ms / 1000.0
             fields = dict(zip(_paths, values))
 
             if recorder is not None:
                 recorder.log_many(fields, t_s=t_s)
 
-            pitch = fields["imu/pitch"]
-            fwd = fields["body/forward_velocity"]
-            yaw = fields["body/yaw_rate"]
+            pitch = fields["observer/pitch"]
+            fwd = fields["observer/forward_velocity"]
+            yaw = fields["observer/turn_velocity"]
             print(
                 f"\rpitch={pitch:+.3f}  fwd={fwd:+.3f}  yaw={yaw:+.3f}",
                 end="",

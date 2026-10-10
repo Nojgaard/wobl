@@ -4,6 +4,7 @@
 #include "protected.hpp"
 #include "robot.hpp"
 #include "control/leg_kinematics.hpp"
+#include "comms/broadcaster.hpp"
 
 class Pilot {
 public:
@@ -11,7 +12,7 @@ public:
     float syncRate;
   };
 
-  Pilot(Robot &robot) : _robot(robot) {}
+  Pilot(Robot &robot, Broadcaster &broadcaster) : _robot(robot), _broadcaster(broadcaster) {}
 
   void init();
   void update();
@@ -31,6 +32,8 @@ private:
   float _tarHeight = LegKinematics::NOMINAL_HEIGHT;
 
   bool _pressedStart = false;
+  bool _pressedSelect = false;
 
   Robot &_robot;
+  Broadcaster &_broadcaster;
 };

@@ -54,8 +54,7 @@ template <typename Context> struct CommandEntry {
   // Read-only entry
   template <auto Context::*Member>
   static constexpr CommandEntry field(char key, const char *name) {
-    return {key, name, nullptr,
-            [](const char *name, const Context &context) {
+    return {key, name, nullptr, [](const char *name, const Context &context) {
               Serial.printf("%s: ", name);
               printValue(context.*Member);
             }};
@@ -343,12 +342,25 @@ void cmdBroadcast(const char *args, Console &console) {
 
   static constexpr Entry commands[] = {
       {'e', "enable [0|1]",
-       [](auto, auto args, auto &broadcaster) {
-         const bool enable = args[0] == '1';
+       [](auto, auto args, Broadcaster &broadcaster) {
+         bool enable = args[0] == '1';
          broadcaster.enable(enable);
+         enable = broadcaster.enabled(); // enabling wifi might have failed
          Serial.printf("Broadcast %s\n", enable ? "ENABLED" : "DISABLED");
        }},
-  };
+      {'s', "ssid",
+       [](auto, auto args, Broadcaster &broadcaster) {
+         if (broadcaster.saveSsid(args))
+           Serial.printf("SSID set to: %s\n", args);
+         else
+           Serial.printf("Failed to store ssid %s\n", args);
+       }},
+      {'p', "password", [](auto, auto args, Broadcaster &broadcaster) {
+         if (broadcaster.savePassword(args))
+           Serial.printf("Password set");
+         else
+           Serial.printf("Failed to store password %s\n", args);
+       }}};
 
   CommandTable::dispatch(commands, args, console.broadcaster);
 }

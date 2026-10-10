@@ -89,6 +89,13 @@ void Pilot::update() {
   }
   _pressedStart = gamepad->miscStart();
 
+  // On select, toggle broadcast telemetry over WIFI
+  if (_pressedSelect && !gamepad->miscSelect()) {
+    scanForDevices(false); // BLE scanning blocks WIFI
+    _broadcaster.enable(!_broadcaster.enabled());
+  }
+  _pressedSelect = gamepad->miscSelect();
+
   _tarFwdVel.Ts = dt;
   _tarTurnVel.Ts = dt;
   float tarFwdVel = _tarFwdVel(normalizeAxis(-gamepad->axisY()) * MAX_FWD_VEL);
@@ -102,7 +109,7 @@ void Pilot::update() {
                           LegKinematics::HEIGHT_MAX);
 
   float roll =
-      (normalizeTrigger(gamepad->l2()) - normalizeTrigger(gamepad->r2())) *
+      (normalizeTrigger(gamepad->brake()) - normalizeTrigger(gamepad->throttle())) *
       MAX_ROLL;
 
   _robot.controller.command({.enable = _enableController,
@@ -111,7 +118,7 @@ void Pilot::update() {
                              .forwardVelocity = tarFwdVel,
                              .turnVelocity = tarTurnVel});
 
-  _status.write({.syncRate = 1000.0f / dt});
+  _status.write({.syncRate = 1.0f / dt});
 
   /*static unsigned long lastPrintMs = 0;
   if (now - lastPrintMs > 1000) {

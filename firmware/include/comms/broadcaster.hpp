@@ -8,6 +8,10 @@ public:
   void update();
 
   void enable(bool on);
+  bool enabled() { return _enabled; }
+
+  bool saveSsid(const char *newSsid);
+  bool savePassword(const char *newPassword);
 
 private:
   bool _enabled = false;

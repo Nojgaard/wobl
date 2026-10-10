@@ -15,7 +15,7 @@ void MotionController::init() {
         .position = -3.333f,
         .velocity = -4.017f,
       },
-      .poseGains = PoseGains{.roll = 0.3f, .rollRate = 0.1f},
+      .poseGains = PoseGains{.roll = 0.0f, .rollRate = 0.0f},
   });
 
   _command.write(Command{
@@ -94,7 +94,6 @@ ServoSubsystem::Command MotionController::pose(const Command &cmd,
   float hff = WheelKinematics::WHEEL_BASE * sinf(cmd.roll) - terrain_dh;
 
   float dh = hff + gains.roll * (cmd.roll - state.roll) - gains.rollRate * state.rollRate;
-  dh = 0; // disable for now to just test height adjustment
 
   float lh = cmd.height + 0.5f * dh;
   float rh = cmd.height - 0.5f * dh;
@@ -141,11 +140,6 @@ MotionController::update(const ImuSubsystem::Telemetry &imuTelemetry,
 
   output.wheels = balance(cmd, state, dt);
   output.servos = pose(cmd, state, dt);
-
-  /*output.servos = ServoSubsystem::Command{
-      .left = Servo::Command{.enabled = true, .positionRad = 0.1f},
-      .right = Servo::Command{.enabled = true, .positionRad = 0.1f},
-  };*/
 
   sync(cmd, state, output, dt);
 

@@ -4,7 +4,7 @@
 static constexpr int kServoRxPin = 16;
 static constexpr int kServoTxPin = 17;
 static constexpr long kServoBaud = 1000000;
-static constexpr long kCommandPeriodMs = 50;
+static constexpr long kCommandPeriodMs = 25;
 static constexpr float kMaxVelocityRps = 1.0f;
 static constexpr float kMaxAccelerationRps2 = 5.0f;
 
@@ -67,7 +67,7 @@ void ServoSubsystem::syncCommand() {
 
 void ServoSubsystem::syncTelemetry() {
   long now = millis();
-  if (now - _lastFeedbackTime < 50) {
+  if (now - _lastFeedbackTime < 25) {
     return;
   }
 
@@ -121,7 +121,7 @@ void ServoSubsystem::loop() {
     handleRequests();
     syncCommand();
     syncTelemetry();
-    vTaskDelay(pdMS_TO_TICKS(10));
+    vTaskDelay(pdMS_TO_TICKS(5));
   }
 }
 
